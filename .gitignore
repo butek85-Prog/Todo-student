@@ -1,0 +1,26 @@
+# Конфиденциальные данные и токены
+.env
+bot_token.txt
+
+# Виртуальные окружения
+.venv/
+venv/
+env/
+ENV/
+
+# Python кэш и байт-код
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node.js
+node_modules/
+
+# Данные пользователей и временные файлы
+user_tasks/
+*.log
+
+# PyInstaller и сборка
+build/
+dist/
+*.spec
