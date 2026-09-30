@@ -459,12 +459,12 @@ def run_bot() -> None:
     bot_username = bot_info.get("username", "UnknownBot")
     bot_first_name = bot_info.get("first_name", "TodoBot")
 
-    print("\n" + "=" * 60)
-    print(f" 🚀 Бот успешно запущен: @{bot_username} ({bot_first_name})")
-    print(" 🔒 Режим: Индивидуальные списки задач по каждому Telegram ID")
-    print(f" 📁 Папка персональных баз: {USER_TASKS_DIR.resolve()}")
-    print(" Бот ожидает входящие сообщения. Для остановки нажмите Ctrl+C.")
-    print("=" * 60 + "\n")
+    print("\n" + "=" * 60, flush=True)
+    print(f" 🚀 Бот успешно запущен: @{bot_username} ({bot_first_name})", flush=True)
+    print(" 🔒 Режим: Индивидуальные списки задач по каждому Telegram ID", flush=True)
+    print(f" 📁 Папка персональных баз: {USER_TASKS_DIR.resolve()}", flush=True)
+    print(" Бот ожидает входящие сообщения. Для остановки нажмите Ctrl+C.", flush=True)
+    print("=" * 60 + "\n", flush=True)
 
     offset = 0
     pending_add = set()
@@ -477,15 +477,25 @@ def run_bot() -> None:
                 offset = max(offset, update_id + 1)
 
                 if "message" in update:
-                    handle_message(bot, update["message"], pending_add)
+                    msg = update["message"]
+                    sender = msg.get("from", {}).get("username") or msg.get("from", {}).get("first_name", "User")
+                    uid = msg.get("from", {}).get("id")
+                    txt = msg.get("text", "")
+                    print(f"[{time.strftime('%H:%M:%S')}] Сообщение от @{sender} (ID: {uid}): {txt}", flush=True)
+                    handle_message(bot, msg, pending_add)
                 elif "callback_query" in update:
-                    handle_callback_query(bot, update["callback_query"])
+                    cb = update["callback_query"]
+                    sender = cb.get("from", {}).get("username") or cb.get("from", {}).get("first_name", "User")
+                    uid = cb.get("from", {}).get("id")
+                    data = cb.get("data", "")
+                    print(f"[{time.strftime('%H:%M:%S')}] Кнопка от @{sender} (ID: {uid}): {data}", flush=True)
+                    handle_callback_query(bot, cb)
 
         except KeyboardInterrupt:
-            print("\nОстановка бота по запросу пользователя.")
+            print("\nОстановка бота по запросу пользователя.", flush=True)
             break
         except Exception as e:
-            print(f"Неожиданная ошибка в цикле: {e}", file=sys.stderr)
+            print(f"Неожиданная ошибка в цикле: {e}", file=sys.stderr, flush=True)
             time.sleep(3)
 
 
