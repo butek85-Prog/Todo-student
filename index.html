@@ -1,0 +1,2096 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Планировщик задач • Telegram Web Edition</title>
+  <style>
+    :root {
+      --bg-primary: #0e1621;
+      --bg-secondary: #17212b;
+      --bg-card: #202b36;
+      --bg-hover: #2b394a;
+      --border-color: #242f3d;
+      --text-primary: #f5f5f5;
+      --text-secondary: #8e9ca8;
+      --accent: #2aabee;
+      --accent-hover: #2299d9;
+      --accent-light: rgba(42, 171, 238, 0.15);
+      --success: #31b545;
+      --success-light: rgba(49, 181, 69, 0.18);
+      --danger: #e53935;
+      --danger-light: rgba(229, 57, 53, 0.15);
+      --warning: #f59e0b;
+      --chat-bg: #0e1621;
+      --bot-msg-bg: #182533;
+      --user-msg-bg: #2b5278;
+      --btn-inline-bg: #232e3c;
+      --btn-inline-hover: #2f3e52;
+      --shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      --radius: 12px;
+    }
+
+    [data-theme="light"] {
+      --bg-primary: #f0f2f5;
+      --bg-secondary: #ffffff;
+      --bg-card: #ffffff;
+      --bg-hover: #f3f4f6;
+      --border-color: #e5e7eb;
+      --text-primary: #1f2937;
+      --text-secondary: #6b7280;
+      --accent: #2481cc;
+      --accent-hover: #1c6cae;
+      --accent-light: rgba(36, 129, 204, 0.1);
+      --success: #10b981;
+      --success-light: rgba(16, 185, 129, 0.12);
+      --danger: #ef4444;
+      --danger-light: rgba(239, 68, 68, 0.1);
+      --warning: #d97706;
+      --chat-bg: #e4e8eb;
+      --bot-msg-bg: #ffffff;
+      --user-msg-bg: #effedd;
+      --btn-inline-bg: #e8ecf0;
+      --btn-inline-hover: #dce2e8;
+      --shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    /* Верхняя панель навигации */
+    header {
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #2aabee, #2275b3);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(42, 171, 238, 0.4);
+    }
+
+    .brand-icon svg {
+      width: 22px;
+      height: 22px;
+      fill: #ffffff;
+    }
+
+    .brand-text h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .brand-text .status-badge {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--success);
+      display: inline-block;
+      box-shadow: 0 0 6px var(--success);
+    }
+    .status-dot.offline {
+      background-color: var(--warning);
+      box-shadow: 0 0 6px var(--warning);
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-select-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .user-select {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      outline: none;
+    }
+    .user-select:focus {
+      border-color: var(--accent);
+    }
+
+    .btn-icon {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 1.1rem;
+    }
+    .btn-icon:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+    }
+
+    /* Навигационные вкладки */
+    .nav-tabs {
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      padding: 6px 16px;
+    }
+
+    .nav-tab {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+    .nav-tab:hover {
+      color: var(--text-primary);
+      background-color: var(--bg-hover);
+    }
+    .nav-tab.active {
+      color: var(--accent);
+      background-color: var(--accent-light);
+    }
+
+    /* Основной контент */
+    main {
+      flex: 1;
+      max-width: 900px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    /* ==============================================================
+       ВКЛАДКА 1: TELEGRAM BOT ЧАТ
+       ============================================================== */
+    .tg-chat-container {
+      background-color: var(--chat-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      height: 680px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .tg-chat-header {
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tg-bot-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tg-bot-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #2aabee, #1d72b8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      color: #fff;
+    }
+
+    .tg-bot-name {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .tg-bot-status {
+      font-size: 0.8rem;
+      color: var(--accent);
+    }
+
+    .tg-chat-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tg-action-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tg-action-btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+    }
+
+    .tg-messages-box {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scroll-behavior: smooth;
+    }
+
+    .tg-date-divider {
+      align-self: center;
+      background: rgba(0, 0, 0, 0.25);
+      color: #ffffff;
+      padding: 4px 14px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .tg-msg {
+      max-width: 82%;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 0.93rem;
+      line-height: 1.45;
+      position: relative;
+      word-wrap: break-word;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .tg-msg-bot {
+      align-self: flex-start;
+      background-color: var(--bot-msg-bg);
+      color: var(--text-primary);
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    }
+
+    .tg-msg-user {
+      align-self: flex-end;
+      background-color: var(--user-msg-bg);
+      color: var(--text-primary);
+      border-bottom-right-radius: 4px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    }
+
+    .tg-msg-text {
+      white-space: pre-wrap;
+    }
+
+    .tg-msg-text code {
+      background: rgba(125, 125, 125, 0.2);
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+
+    .tg-msg-meta {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      text-align: right;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    /* Инлайн-клавиатура Telegram */
+    .tg-inline-keyboard {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .tg-inline-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .tg-inline-btn {
+      flex: 1;
+      background-color: var(--btn-inline-bg);
+      border: 1px solid var(--border-color);
+      color: var(--accent);
+      font-family: inherit;
+      font-size: 0.88rem;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .tg-inline-btn:hover {
+      background-color: var(--btn-inline-hover);
+      border-color: var(--accent);
+    }
+    .tg-inline-btn.btn-del {
+      flex: 0 0 44px;
+      color: var(--danger);
+    }
+    .tg-inline-btn.btn-del:hover {
+      background-color: var(--danger-light);
+    }
+
+    /* Постоянная нижняя клавиатура (Reply Keyboard) */
+    .tg-reply-keyboard {
+      background-color: var(--bg-secondary);
+      border-top: 1px solid var(--border-color);
+      padding: 8px 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .tg-reply-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .tg-reply-btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .tg-reply-btn.full-width {
+      grid-column: span 2;
+    }
+
+    /* Панель ввода чата */
+    .tg-input-bar {
+      background-color: var(--bg-secondary);
+      border-top: 1px solid var(--border-color);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .tg-input {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 10px 14px;
+      border-radius: 20px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+    }
+    .tg-input:focus {
+      border-color: var(--accent);
+    }
+
+    .tg-send-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background-color: var(--accent);
+      border: none;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.15s ease, background-color 0.15s ease;
+    }
+    .tg-send-btn:hover {
+      background-color: var(--accent-hover);
+      transform: scale(1.05);
+    }
+    .tg-send-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: #ffffff;
+      margin-left: 2px;
+    }
+
+    /* Быстрые чипы команд */
+    .tg-command-chips {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 6px 14px;
+      background-color: var(--bg-secondary);
+      border-top: 1px solid var(--border-color);
+    }
+
+    .tg-chip {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--accent);
+      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tg-chip:hover {
+      background: var(--accent-light);
+    }
+
+    /* ==============================================================
+       ВКЛАДКА 2: СОВРЕМЕННАЯ ПАНЕЛЬ ЗАДАЧ (DASHBOARD)
+       ============================================================== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .stat-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+    }
+    .stat-icon.total { background: var(--accent-light); color: var(--accent); }
+    .stat-icon.pending { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+    .stat-icon.done { background: var(--success-light); color: var(--success); }
+
+    .stat-info .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .stat-info .stat-label {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+    }
+
+    .progress-bar-container {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.88rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 8px;
+      background: var(--border-color);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--success));
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    /* Форма ввода задачи */
+    .add-task-box {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .add-task-form {
+      display: flex;
+      gap: 10px;
+    }
+
+    .task-input {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-family: inherit;
+      outline: none;
+    }
+    .task-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-light);
+    }
+
+    .btn-add {
+      background-color: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background-color 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn-add:hover {
+      background-color: var(--accent-hover);
+    }
+
+    /* Панель фильтров */
+    .filter-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .filter-tabs {
+      display: flex;
+      gap: 6px;
+      background: var(--bg-secondary);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    .filter-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .filter-btn:hover {
+      color: var(--text-primary);
+    }
+    .filter-btn.active {
+      background: var(--accent);
+      color: #ffffff;
+    }
+
+    .search-box {
+      position: relative;
+      min-width: 200px;
+    }
+    .search-input {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 8px 12px 8px 34px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      width: 100%;
+      outline: none;
+    }
+    .search-input:focus {
+      border-color: var(--accent);
+    }
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      pointer-events: none;
+    }
+
+    /* Список задач */
+    .tasks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .task-item {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    }
+    .task-item:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+    .task-item.completed {
+      opacity: 0.72;
+    }
+
+    .task-checkbox-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid var(--text-secondary);
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+    .task-checkbox-btn:hover {
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+    .task-item.completed .task-checkbox-btn {
+      background: var(--success);
+      border-color: var(--success);
+      color: #fff;
+    }
+
+    .task-id-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 2px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .task-text {
+      flex: 1;
+      font-size: 0.98rem;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+    .task-item.completed .task-text {
+      text-decoration: line-through;
+      color: var(--text-secondary);
+    }
+
+    .task-actions {
+      display: flex;
+      gap: 6px;
+      opacity: 0.8;
+      transition: opacity 0.15s ease;
+    }
+    .task-item:hover .task-actions {
+      opacity: 1;
+    }
+
+    .btn-task-action {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.15s ease;
+    }
+    .btn-task-action:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border-color: var(--border-color);
+    }
+    .btn-task-action.delete:hover {
+      color: var(--danger);
+      background: var(--danger-light);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 16px;
+      color: var(--text-secondary);
+      background: var(--bg-secondary);
+      border: 1px dashed var(--border-color);
+      border-radius: var(--radius);
+    }
+    .empty-icon {
+      font-size: 3rem;
+      margin-bottom: 12px;
+    }
+
+    /* ==============================================================
+       ВКЛАДКА 3: СПРАВКА И API
+       ============================================================== */
+    .docs-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+      line-height: 1.6;
+    }
+    .docs-card h2 {
+      font-size: 1.25rem;
+      margin-bottom: 14px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .docs-card h3 {
+      font-size: 1rem;
+      margin: 16px 0 8px 0;
+    }
+    .docs-card p {
+      margin-bottom: 10px;
+      color: var(--text-primary);
+    }
+    .docs-card ul {
+      margin-left: 20px;
+      margin-bottom: 12px;
+      color: var(--text-primary);
+    }
+    .docs-card code {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: var(--accent);
+    }
+    .api-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 0.88rem;
+    }
+    .api-table th, .api-table td {
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      text-align: left;
+    }
+    .api-table th {
+      background: var(--bg-card);
+      font-weight: 700;
+    }
+
+    /* Toast Уведомления */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 12px 18px;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      font-size: 0.9rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: slideIn 0.25s ease;
+      border-left: 4px solid var(--accent);
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* Модальное окно */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal-box {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 24px;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: var(--shadow);
+    }
+    .modal-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .modal-input {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      margin-bottom: 16px;
+      outline: none;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .btn-secondary {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    @media (max-width: 640px) {
+      header { padding: 10px 14px; }
+      .header-controls { gap: 6px; }
+      .user-select { max-width: 140px; }
+      .nav-tab { padding: 6px 10px; font-size: 0.85rem; }
+      .tg-chat-container { height: 580px; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Верхняя панель -->
+  <header>
+    <a href="#" class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .37z"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>Планировщик задач</h1>
+        <div class="status-badge">
+          <span class="status-dot" id="serverStatusDot"></span>
+          <span id="serverStatusText">Проверка сервера...</span>
+        </div>
+      </div>
+    </a>
+
+    <div class="header-controls">
+      <div class="user-select-wrapper">
+        <select class="user-select" id="userSelector" title="Выберите базу задач">
+          <option value="default">📁 Общий список (tasks.json)</option>
+        </select>
+      </div>
+
+      <button class="btn-icon" id="themeToggleBtn" title="Переключить тему (Светлая / Тёмная)">
+        🌙
+      </button>
+    </div>
+  </header>
+
+  <!-- Вкладки навигации -->
+  <nav class="nav-tabs">
+    <button class="nav-tab active" data-tab="tabChat">
+      <span>📱</span> Telegram Бот (Чат)
+    </button>
+    <button class="nav-tab" data-tab="tabDashboard">
+      <span>📋</span> Панель задач
+    </button>
+    <button class="nav-tab" data-tab="tabDocs">
+      <span>ℹ️</span> Справка и API
+    </button>
+  </nav>
+
+  <!-- Основное содержимое -->
+  <main>
+    <!-- ==================== ВКЛАДКА 1: TELEGRAM BOT ЧАТ ==================== -->
+    <section id="tabChat" class="tab-content active">
+      <div class="tg-chat-container">
+        <!-- Шапка чата -->
+        <div class="tg-chat-header">
+          <div class="tg-bot-info">
+            <div class="tg-bot-avatar">🤖</div>
+            <div>
+              <div class="tg-bot-name">TodoBot (Планировщик)</div>
+              <div class="tg-bot-status" id="chatBotSubtitle">бот • онлайн • ID: Локальный</div>
+            </div>
+          </div>
+          <div class="tg-chat-actions">
+            <button class="tg-action-btn" id="btnChatRefresh">🔄 /list</button>
+            <button class="tg-action-btn" id="btnChatClear">🧹 Очистить чат</button>
+          </div>
+        </div>
+
+        <!-- Лента сообщений -->
+        <div class="tg-messages-box" id="tgMessages">
+          <div class="tg-date-divider">Сегодня</div>
+        </div>
+
+        <!-- Быстрые команды -->
+        <div class="tg-command-chips">
+          <button class="tg-chip" data-cmd="/start">/start</button>
+          <button class="tg-chip" data-cmd="/list">/list</button>
+          <button class="tg-chip" data-cmd="➕ Добавить задачу">➕ Добавить</button>
+          <button class="tg-chip" data-cmd="/help">/help</button>
+        </div>
+
+        <!-- Постоянная клавиатура (Reply Keyboard) -->
+        <div class="tg-reply-keyboard" id="tgReplyKeyboard">
+          <button class="tg-reply-btn" data-text="📋 Список задач">📋 Список задач</button>
+          <button class="tg-reply-btn" data-text="➕ Добавить задачу">➕ Добавить задачу</button>
+          <button class="tg-reply-btn full-width" data-text="ℹ️ Помощь">ℹ️ Помощь</button>
+        </div>
+
+        <!-- Поле ввода сообщения -->
+        <form class="tg-input-bar" id="tgChatForm">
+          <input type="text" class="tg-input" id="tgChatInput" placeholder="Напишите задачу или команду (/add, /done, /delete)..." autocomplete="off" />
+          <button type="submit" class="tg-send-btn" title="Отправить сообщение">
+            <svg viewBox="0 0 24 24">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ==================== ВКЛАДКА 2: ПАНЕЛЬ ЗАДАЧ ==================== -->
+    <section id="tabDashboard" class="tab-content">
+      <!-- Статистика -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon total">📌</div>
+          <div class="stat-info">
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-label">Всего задач</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon pending">⏳</div>
+          <div class="stat-info">
+            <div class="stat-value" id="statPending">0</div>
+            <div class="stat-label">В работе</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon done">✅</div>
+          <div class="stat-info">
+            <div class="stat-value" id="statDone">0</div>
+            <div class="stat-label">Выполнено</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Прогресс выполнения -->
+      <div class="progress-bar-container">
+        <div class="progress-header">
+          <span>Прогресс выполнения</span>
+          <span id="progressPercent">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+      </div>
+
+      <!-- Форма добавления задачи -->
+      <div class="add-task-box">
+        <form class="add-task-form" id="dashAddForm">
+          <input type="text" class="task-input" id="dashTaskInput" placeholder="Что нужно сделать? Введите текст задачи..." autocomplete="off" />
+          <button type="submit" class="btn-add">➕ Добавить</button>
+        </form>
+      </div>
+
+      <!-- Фильтры и поиск -->
+      <div class="filter-bar">
+        <div class="filter-tabs">
+          <button class="filter-btn active" data-filter="all">Все (<span id="countAll">0</span>)</button>
+          <button class="filter-btn" data-filter="active">Активные (<span id="countActive">0</span>)</button>
+          <button class="filter-btn" data-filter="done">Выполненные (<span id="countDone">0</span>)</button>
+        </div>
+
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" id="taskSearchInput" placeholder="Поиск по задачам..." />
+          </div>
+          <button class="btn-secondary" id="btnClearCompleted" title="Удалить все выполненные задачи" style="font-size: 0.85rem; padding: 7px 12px;">
+            🧹 Очистить
+          </button>
+        </div>
+      </div>
+
+      <!-- Список задач -->
+      <div class="tasks-list" id="tasksListContainer">
+        <!-- Задачи вставляются через JS -->
+      </div>
+    </section>
+
+    <!-- ==================== ВКЛАДКА 3: СПРАВКА И API ==================== -->
+    <section id="tabDocs" class="tab-content">
+      <div class="docs-card">
+        <h2>ℹ️ О веб-приложении</h2>
+        <p>Данная веб-страница представляет собой полноценное переосмысление консольного и Telegram-бота планировщика задач в виде интерактивного современного веб-приложения.</p>
+        <p>Она полностью совместима с существующими файлами базы данных:</p>
+        <ul>
+          <li><b>Общие задачи:</b> файл <code>tasks.json</code> (используется Windows GUI <code>todo.exe</code>, CLI и общим режимом);</li>
+          <li><b>Персональные задачи Telegram:</b> файлы в папке <code>user_tasks/&lt;user_id&gt;.json</code>. Каждый пользователь получает свой изолированный список;</li>
+          <li><b>Выбор профиля:</b> в правом верхнем углу вы можете мгновенно переключаться между базой <code>tasks.json</code> и персональными Telegram-пользователями!</li>
+        </ul>
+
+        <h3>⚡ Как запустить веб-сервер:</h3>
+        <p>Веб-сервер работает без каких-либо сторонних библиотек на стандартном Python 3:</p>
+        <pre style="background: var(--bg-card); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); overflow-x: auto; margin: 8px 0;"><code>python web_app.py
+# или дважды кликните по run_web.bat</code></pre>
+
+        <h3>🤖 Команды чата Telegram бота:</h3>
+        <ul>
+          <li><code>/start</code> — приветствие и запуск бота с персональной клавиатурой;</li>
+          <li><code>/list</code> — вывод персонального списка с кликабельными инлайн-кнопками;</li>
+          <li><code>/add &lt;текст&gt;</code> — добавление новой задачи;</li>
+          <li><code>/done &lt;id&gt;</code> — отметка задачи как выполненной;</li>
+          <li><code>/delete &lt;id&gt;</code> — удаление задачи;</li>
+          <li><b>Обычный текст</b> — просто отправьте текст задачи в чат, и бот сразу добавит её!</li>
+        </ul>
+
+        <h3>🔌 Доступные REST API эндпоинты:</h3>
+        <table class="api-table">
+          <thead>
+            <tr>
+              <th>Метод</th>
+              <th>Путь</th>
+              <th>Описание</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/tasks?user_id=...</code></td>
+              <td>Получение списка задач и статистики</td>
+            </tr>
+            <tr>
+              <td><code>POST</code></td>
+              <td><code>/api/tasks</code></td>
+              <td>Создание новой задачи (<code>{"text": "...", "user_id": "..."}</code>)</td>
+            </tr>
+            <tr>
+              <td><code>POST</code></td>
+              <td><code>/api/tasks/&lt;id&gt;/toggle</code></td>
+              <td>Переключение статуса задачи (выполнена / активна)</td>
+            </tr>
+            <tr>
+              <td><code>POST</code></td>
+              <td><code>/api/tasks/&lt;id&gt;/edit</code></td>
+              <td>Редактирование текста задачи (<code>{"text": "..."}</code>)</td>
+            </tr>
+            <tr>
+              <td><code>DELETE</code></td>
+              <td><code>/api/tasks/&lt;id&gt;?user_id=...</code></td>
+              <td>Удаление задачи по её идентификатору</td>
+            </tr>
+            <tr>
+              <td><code>POST</code></td>
+              <td><code>/api/tasks/clear-completed</code></td>
+              <td>Удаление всех завершенных задач</td>
+            </tr>
+            <tr>
+              <td><code>GET</code></td>
+              <td><code>/api/users</code></td>
+              <td>Список доступных профилей пользователей из <code>user_tasks/</code></td>
+            </tr>
+            <tr>
+              <td><code>POST</code></td>
+              <td><code>/api/bot/chat</code></td>
+              <td>Отправка сообщения/команды в логику Telegram-бота</td>
+            </tr>
+            <tr>
+              <td><code>POST</code></td>
+              <td><code>/api/bot/callback</code></td>
+              <td>Обработка нажатий на инлайн-кнопки бота</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Всплывающие уведомления (Toasts) -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Модальное окно для ввода нового ID пользователя -->
+  <div class="modal-overlay" id="newUserModal">
+    <div class="modal-box">
+      <div class="modal-title">👤 Укажите Telegram ID или имя профиля</div>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">
+        Будет создан или открыт персональный список задач в <code>user_tasks/&lt;id&gt;.json</code>.
+      </p>
+      <input type="text" class="modal-input" id="newUserIdInput" placeholder="Например: 5265404800 или test_user" />
+      <div class="modal-actions">
+        <button class="btn-secondary" id="modalCancelBtn">Отмена</button>
+        <button class="btn-primary" id="modalConfirmBtn">Открыть задачи</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==============================================================
+    // СОСТОЯНИЕ ПРИЛОЖЕНИЯ
+    // ==============================================================
+    const state = {
+      isServerOnline: false,
+      userId: localStorage.getItem("todo_user_id") || "default",
+      tasks: [],
+      stats: { total: 0, done: 0, pending: 0, percent: 0 },
+      currentFilter: "all",
+      searchQuery: "",
+      theme: localStorage.getItem("todo_theme") || "dark",
+    };
+
+    // Применение сохраненной темы
+    document.documentElement.setAttribute("data-theme", state.theme);
+    const themeBtn = document.getElementById("themeToggleBtn");
+    if (themeBtn) {
+      themeBtn.textContent = state.theme === "dark" ? "☀️" : "🌙";
+    }
+
+    // ==============================================================
+    // УВЕДОМЛЕНИЯ (TOAST)
+    // ==============================================================
+    function showToast(message, isError = false) {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      if (isError) toast.style.borderLeftColor = "var(--danger)";
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transition = "opacity 0.3s ease";
+        setTimeout(() => toast.remove(), 300);
+      }, 2500);
+    }
+
+    // ==============================================================
+    // СЕТЕВОЕ ВЗАИМОДЕЙСТВИЕ И РАБОТА С ХРАНИЛИЩЕМ
+    // ==============================================================
+    async function checkServerStatus() {
+      const dot = document.getElementById("serverStatusDot");
+      const text = document.getElementById("serverStatusText");
+
+      try {
+        const res = await fetch("/api/users", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          state.isServerOnline = true;
+          dot.className = "status-dot";
+          text.textContent = "Онлайн (tasks.json подключен)";
+          updateUserSelector(data.users || []);
+          return true;
+        }
+      } catch (e) {
+        // Офлайн режим
+      }
+
+      state.isServerOnline = false;
+      dot.className = "status-dot offline";
+      text.textContent = "Офлайн (локальное хранилище)";
+      return false;
+    }
+
+    function updateUserSelector(users) {
+      const select = document.getElementById("userSelector");
+      const currentVal = state.userId;
+      select.innerHTML = "";
+
+      let hasCurrent = false;
+
+      users.forEach((u) => {
+        const opt = document.createElement("option");
+        opt.value = u.id;
+        opt.textContent = `${u.name} (${u.total})`;
+        if (u.id === currentVal) {
+          opt.selected = true;
+          hasCurrent = true;
+        }
+        select.appendChild(opt);
+      });
+
+      // Опция создания/ввода нового пользователя
+      const newOpt = document.createElement("option");
+      newOpt.value = "__new__";
+      newOpt.textContent = "➕ Ввести другой Telegram ID...";
+      select.appendChild(newOpt);
+
+      if (!hasCurrent && currentVal !== "default") {
+        const customOpt = document.createElement("option");
+        customOpt.value = currentVal;
+        customOpt.textContent = `👤 ID: ${currentVal}`;
+        customOpt.selected = true;
+        select.insertBefore(customOpt, newOpt);
+      }
+
+      updateBotSubtitle();
+    }
+
+    function updateBotSubtitle() {
+      const sub = document.getElementById("chatBotSubtitle");
+      const displayId = state.userId === "default" ? "Локальный (tasks.json)" : state.userId;
+      sub.textContent = `бот • онлайн • ID: ${displayId}`;
+    }
+
+    // Загрузка задач
+    async function fetchTasks() {
+      if (state.isServerOnline) {
+        try {
+          const url = `/api/tasks?user_id=${encodeURIComponent(state.userId)}`;
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.ok) {
+            state.tasks = data.tasks;
+            state.stats = data.stats;
+            renderDashboard();
+            return;
+          }
+        } catch (e) {
+          console.error("Ошибка загрузки задач с сервера", e);
+        }
+      }
+
+      // Офлайн фоллбэк на localStorage
+      const storageKey = `todo_tasks_${state.userId}`;
+      const saved = localStorage.getItem(storageKey);
+      state.tasks = saved ? JSON.parse(saved) : [];
+      const total = state.tasks.length;
+      const done = state.tasks.filter((t) => t.done).length;
+      state.stats = {
+        total,
+        done,
+        pending: total - done,
+        percent: total > 0 ? Math.round((done / total) * 100) : 0,
+      };
+      renderDashboard();
+    }
+
+    // Сохранение в офлайн-режиме
+    function saveTasksOffline() {
+      const storageKey = `todo_tasks_${state.userId}`;
+      localStorage.setItem(storageKey, JSON.stringify(state.tasks));
+      const total = state.tasks.length;
+      const done = state.tasks.filter((t) => t.done).length;
+      state.stats = {
+        total,
+        done,
+        pending: total - done,
+        percent: total > 0 ? Math.round((done / total) * 100) : 0,
+      };
+      renderDashboard();
+    }
+
+    // ==============================================================
+    // ОПЕРАЦИИ С ЗАДАЧАМИ (API / OFFLINE)
+    // ==============================================================
+    async function apiAddTask(text) {
+      if (!text.trim()) return null;
+
+      if (state.isServerOnline) {
+        try {
+          const res = await fetch("/api/tasks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, user_id: state.userId }),
+          });
+          const data = await res.json();
+          if (data.ok) {
+            await fetchTasks();
+            return data.task;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // Офлайн
+      const newId = state.tasks.reduce((max, t) => Math.max(max, t.id || 0), 0) + 1;
+      const newTask = { id: newId, text: text.trim(), done: false };
+      state.tasks.push(newTask);
+      saveTasksOffline();
+      return newTask;
+    }
+
+    async function apiToggleTask(taskId) {
+      if (state.isServerOnline) {
+        try {
+          const res = await fetch(`/api/tasks/${taskId}/toggle`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: state.userId }),
+          });
+          const data = await res.json();
+          if (data.ok) {
+            await fetchTasks();
+            return data.task;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // Офлайн
+      const task = state.tasks.find((t) => t.id === taskId);
+      if (task) {
+        task.done = !task.done;
+        saveTasksOffline();
+        return task;
+      }
+      return null;
+    }
+
+    async function apiDeleteTask(taskId) {
+      if (state.isServerOnline) {
+        try {
+          const res = await fetch(`/api/tasks/${taskId}?user_id=${encodeURIComponent(state.userId)}`, {
+            method: "DELETE",
+          });
+          const data = await res.json();
+          if (data.ok) {
+            await fetchTasks();
+            return true;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // Офлайн
+      const lenBefore = state.tasks.length;
+      state.tasks = state.tasks.filter((t) => t.id !== taskId);
+      if (state.tasks.length !== lenBefore) {
+        saveTasksOffline();
+        return true;
+      }
+      return false;
+    }
+
+    async function apiEditTask(taskId, newText) {
+      if (state.isServerOnline) {
+        try {
+          const res = await fetch(`/api/tasks/${taskId}/edit`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: newText, user_id: state.userId }),
+          });
+          const data = await res.json();
+          if (data.ok) {
+            await fetchTasks();
+            return data.task;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // Офлайн
+      const task = state.tasks.find((t) => t.id === taskId);
+      if (task) {
+        task.text = newText;
+        saveTasksOffline();
+        return task;
+      }
+      return null;
+    }
+
+    async function apiClearCompleted() {
+      if (state.isServerOnline) {
+        try {
+          const res = await fetch(`/api/tasks/clear-completed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: state.userId }),
+          });
+          const data = await res.json();
+          if (data.ok) {
+            await fetchTasks();
+            return data.removed_count;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // Офлайн
+      const active = state.tasks.filter((t) => !t.done);
+      const count = state.tasks.length - active.length;
+      state.tasks = active;
+      saveTasksOffline();
+      return count;
+    }
+
+    // ==============================================================
+    // РЕНДЕРИНГ ПАНЕЛИ ЗАДАЧ (DASHBOARD)
+    // ==============================================================
+    function renderDashboard() {
+      document.getElementById("statTotal").textContent = state.stats.total;
+      document.getElementById("statPending").textContent = state.stats.pending;
+      document.getElementById("statDone").textContent = state.stats.done;
+
+      const pct = state.stats.percent || 0;
+      document.getElementById("progressPercent").textContent = `${pct}%`;
+      document.getElementById("progressFill").style.width = `${pct}%`;
+
+      document.getElementById("countAll").textContent = state.stats.total;
+      document.getElementById("countActive").textContent = state.stats.pending;
+      document.getElementById("countDone").textContent = state.stats.done;
+
+      const listContainer = document.getElementById("tasksListContainer");
+      listContainer.innerHTML = "";
+
+      let filtered = [...state.tasks];
+
+      if (state.currentFilter === "active") {
+        filtered = filtered.filter((t) => !t.done);
+      } else if (state.currentFilter === "done") {
+        filtered = filtered.filter((t) => t.done);
+      }
+
+      if (state.searchQuery) {
+        const q = state.searchQuery.toLowerCase();
+        filtered = filtered.filter((t) => (t.text || "").toLowerCase().includes(q));
+      }
+
+      if (filtered.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty-state";
+        empty.innerHTML = `
+          <div class="empty-icon">📭</div>
+          <h3>Задач не найдено</h3>
+          <p style="margin-top:6px; font-size:0.88rem;">${
+            state.searchQuery
+              ? "Ничего не найдено по вашему запросу."
+              : state.currentFilter !== "all"
+              ? "В данной категории нет задач."
+              : "Список задач пуст! Добавьте первую задачу сверху или отправьте команду боту."
+          }</p>
+        `;
+        listContainer.appendChild(empty);
+        return;
+      }
+
+      filtered.forEach((task) => {
+        const item = document.createElement("div");
+        item.className = `task-item ${task.done ? "completed" : ""}`;
+        item.dataset.id = task.id;
+
+        item.innerHTML = `
+          <button class="task-checkbox-btn" title="${task.done ? 'Вернуть в работу' : 'Отметить выполненной'}">
+            ${task.done ? "✓" : ""}
+          </button>
+          <span class="task-id-badge">#${task.id}</span>
+          <div class="task-text">${escapeHtml(task.text)}</div>
+          <div class="task-actions">
+            <button class="btn-task-action edit" title="Редактировать">✏️</button>
+            <button class="btn-task-action delete" title="Удалить">🗑️</button>
+          </div>
+        `;
+
+        // Переключение статуса
+        item.querySelector(".task-checkbox-btn").addEventListener("click", async () => {
+          const updated = await apiToggleTask(task.id);
+          if (updated) {
+            showToast(updated.done ? `Задача #${task.id} выполнена ✅` : `Задача #${task.id} возвращена ⬜️`);
+          }
+        });
+
+        // Редактирование
+        item.querySelector(".btn-task-action.edit").addEventListener("click", async () => {
+          const newText = prompt("Редактировать текст задачи:", task.text);
+          if (newText !== null && newText.trim() && newText.trim() !== task.text) {
+            await apiEditTask(task.id, newText.trim());
+            showToast("Задача обновлена ✏️");
+          }
+        });
+
+        // Удаление
+        item.querySelector(".btn-task-action.delete").addEventListener("click", async () => {
+          if (confirm(`Удалить задачу #${task.id}: "${task.text}"?`)) {
+            await apiDeleteTask(task.id);
+            showToast(`Задача #${task.id} удалена 🗑️`);
+          }
+        });
+
+        listContainer.appendChild(item);
+      });
+    }
+
+    // ==============================================================
+    // РЕНДЕРИНГ И ЛОГИКА TELEGRAM ЧАТА
+    // ==============================================================
+    function appendChatMessage(sender, text, inlineKeyboard = [], customMeta = null) {
+      const box = document.getElementById("tgMessages");
+      const msgDiv = document.createElement("div");
+      msgDiv.className = `tg-msg ${sender === "bot" ? "tg-msg-bot" : "tg-msg-user"}`;
+
+      const textDiv = document.createElement("div");
+      textDiv.className = "tg-msg-text";
+
+      if (sender === "bot") {
+        // Поддержка безопасных Telegram HTML тегов: <b>, <i>, <code>, <pre>
+        textDiv.innerHTML = formatTelegramHtml(text);
+      } else {
+        textDiv.textContent = text;
+      }
+      msgDiv.appendChild(textDiv);
+
+      // Инлайн-кнопки
+      if (inlineKeyboard && inlineKeyboard.length > 0) {
+        const kbDiv = document.createElement("div");
+        kbDiv.className = "tg-inline-keyboard";
+
+        inlineKeyboard.forEach((row) => {
+          const rowDiv = document.createElement("div");
+          rowDiv.className = "tg-inline-row";
+
+          row.forEach((btn) => {
+            const btnEl = document.createElement("button");
+            btnEl.className = `tg-inline-btn ${btn.callback_data && btn.callback_data.startsWith("del:") ? "btn-del" : ""}`;
+            btnEl.textContent = btn.text;
+            btnEl.dataset.callback = btn.callback_data || "";
+
+            btnEl.addEventListener("click", () => handleInlineButtonClick(btn.callback_data, msgDiv));
+            rowDiv.appendChild(btnEl);
+          });
+
+          kbDiv.appendChild(rowDiv);
+        });
+
+        msgDiv.appendChild(kbDiv);
+      }
+
+      // Метаданные (время)
+      const metaDiv = document.createElement("div");
+      metaDiv.className = "tg-msg-meta";
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      metaDiv.innerHTML = `<span>${timeStr}</span> ${sender === "user" ? "<span>✓✓</span>" : ""}`;
+      msgDiv.appendChild(metaDiv);
+
+      box.appendChild(msgDiv);
+      box.scrollTop = box.scrollHeight;
+
+      return msgDiv;
+    }
+
+    async function handleInlineButtonClick(callbackData, messageElement) {
+      if (!callbackData) return;
+
+      if (state.isServerOnline) {
+        try {
+          const res = await fetch("/api/bot/callback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data: callbackData, user_id: state.userId }),
+          });
+          const data = await res.json();
+          if (data.ok) {
+            if (data.toast) showToast(data.toast);
+
+            // Обновляем текст сообщения и кнопки на месте
+            if (messageElement && data.view_text) {
+              const textDiv = messageElement.querySelector(".tg-msg-text");
+              if (textDiv) textDiv.innerHTML = formatTelegramHtml(data.view_text);
+
+              const existingKb = messageElement.querySelector(".tg-inline-keyboard");
+              if (existingKb) existingKb.remove();
+
+              if (data.inline_keyboard && data.inline_keyboard.length > 0) {
+                const kbDiv = document.createElement("div");
+                kbDiv.className = "tg-inline-keyboard";
+                data.inline_keyboard.forEach((row) => {
+                  const rowDiv = document.createElement("div");
+                  rowDiv.className = "tg-inline-row";
+                  row.forEach((btn) => {
+                    const btnEl = document.createElement("button");
+                    btnEl.className = `tg-inline-btn ${btn.callback_data && btn.callback_data.startsWith("del:") ? "btn-del" : ""}`;
+                    btnEl.textContent = btn.text;
+                    btnEl.dataset.callback = btn.callback_data || "";
+                    btnEl.addEventListener("click", () => handleInlineButtonClick(btn.callback_data, messageElement));
+                    rowDiv.appendChild(btnEl);
+                  });
+                  kbDiv.appendChild(rowDiv);
+                });
+                messageElement.insertBefore(kbDiv, messageElement.querySelector(".tg-msg-meta"));
+              }
+            }
+
+            await fetchTasks();
+            return;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // Офлайн обработка клика
+      if (callbackData.startsWith("toggle:")) {
+        const id = parseInt(callbackData.split(":")[1]);
+        const updated = await apiToggleTask(id);
+        if (updated) {
+          showToast(updated.done ? `Задача #${id} выполнена ✅` : `Задача #${id} возвращена ⬜️`);
+          sendBotMessageCommand("/list");
+        }
+      } else if (callbackData.startsWith("del:")) {
+        const id = parseInt(callbackData.split(":")[1]);
+        const del = await apiDeleteTask(id);
+        if (del) {
+          showToast(`Задача #${id} удалена 🗑️`);
+          sendBotMessageCommand("/list");
+        }
+      } else if (callbackData === "refresh") {
+        showToast("Список обновлен 🔄");
+        sendBotMessageCommand("/list");
+      } else if (callbackData === "prompt_add") {
+        document.getElementById("tgChatInput").focus();
+        showToast("Напишите текст задачи в чат");
+      }
+    }
+
+    async function sendBotMessageCommand(text) {
+      if (!text || !text.trim()) return;
+      const cleanText = text.trim();
+
+      // Отображаем сообщение пользователя в чате
+      appendChatMessage("user", cleanText);
+
+      if (state.isServerOnline) {
+        try {
+          const res = await fetch("/api/bot/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: cleanText,
+              user_id: state.userId,
+              user_name: "Пользователь",
+            }),
+          });
+          const data = await res.json();
+          if (data.ok && data.messages) {
+            data.messages.forEach((msg) => {
+              appendChatMessage("bot", msg.text, msg.inline_keyboard);
+            });
+            await fetchTasks();
+            return;
+          }
+        } catch (e) {
+          console.error("Ошибка запроса бота", e);
+        }
+      }
+
+      // Офлайн логика эмуляции команд
+      handleOfflineBotChat(cleanText);
+    }
+
+    async function handleOfflineBotChat(cmd) {
+      const displayId = state.userId === "default" ? "Локальный" : state.userId;
+
+      if (cmd.startsWith("/start")) {
+        const welcome = `👋 Привет, <b>Пользователь</b>!\n\nЯ ваш <b>персональный бот-планировщик задач</b>.\nВаш ID: <code>${displayId}</code>.\n\n📌 <b>Что я умею:</b>\n• 📋 <code>/list</code> — список задач\n• ➕ <code>/add &lt;текст&gt;</code> — добавить задачу\n• ✅ <code>/done &lt;id&gt;</code> — отметить выполненной\n• 🗑️ <code>/delete &lt;id&gt;</code> — удалить\n\n<i>💡 Или просто напишите любой текст!</i>`;
+        appendChatMessage("bot", welcome);
+        showOfflineTaskListMessage();
+      } else if (cmd.startsWith("/help") || cmd === "ℹ️ Помощь") {
+        const help = `📖 <b>Справка:</b>\n\n• <b>/list</b> — выводит персональный список с кнопками\n• <b>/add &lt;текст&gt;</b> — добавляет задачу\n• <b>/done &lt;id&gt;</b> — отмечает выполненной\n• <b>/delete &lt;id&gt;</b> — удаляет задачу\n• <b>Обычный текст</b> — создает задачу`;
+        appendChatMessage("bot", help);
+      } else if (cmd.startsWith("/list") || cmd === "📋 Список задач") {
+        showOfflineTaskListMessage();
+      } else if (cmd === "➕ Добавить задачу") {
+        appendChatMessage("bot", "✍️ <b>Напишите текст задачи в следующем сообщении:</b>");
+        document.getElementById("tgChatInput").focus();
+      } else if (cmd.startsWith("/add")) {
+        const text = cmd.replace("/add", "").trim();
+        if (text) {
+          const task = await apiAddTask(text);
+          appendChatMessage("bot", `✅ Задача добавлена в список (<b>ID: #${task.id}</b>):\n«${escapeHtml(task.text)}»`);
+          showOfflineTaskListMessage();
+        } else {
+          appendChatMessage("bot", "⚠️ Укажите текст задачи. Пример: <code>/add Купить хлеб</code>");
+        }
+      } else if (cmd.startsWith("/done")) {
+        const id = parseInt(cmd.replace("/done", "").trim());
+        if (id) {
+          const updated = await apiToggleTask(id);
+          if (updated) {
+            appendChatMessage("bot", `✅ Задача #${id} выполнена!`);
+            showOfflineTaskListMessage();
+          } else {
+            appendChatMessage("bot", `❌ Задача с ID #${id} не найдена.`);
+          }
+        }
+      } else if (cmd.startsWith("/delete") || cmd.startsWith("/del")) {
+        const id = parseInt(cmd.replace(/\/delete|\/del/, "").trim());
+        if (id) {
+          const del = await apiDeleteTask(id);
+          if (del) {
+            appendChatMessage("bot", `🗑️ Задача #${id} удалена.`);
+            showOfflineTaskListMessage();
+          } else {
+            appendChatMessage("bot", `❌ Задача с ID #${id} не найдена.`);
+          }
+        }
+      } else {
+        // Обычный текст — добавляем задачу
+        const task = await apiAddTask(cmd);
+        appendChatMessage("bot", `✅ Создана задача (<b>ID: #${task.id}</b>):\n«${escapeHtml(task.text)}»`);
+        showOfflineTaskListMessage();
+      }
+    }
+
+    function showOfflineTaskListMessage() {
+      const tasks = state.tasks;
+      const total = tasks.length;
+      const done = tasks.filter((t) => t.done).length;
+      const pending = total - done;
+
+      if (total === 0) {
+        appendChatMessage("bot", `📋 <b>Ваш список задач пуст!</b>\n\nЧтобы добавить задачу, отправьте команду:\n<code>/add Текст задачи</code>\nили просто напишите её в чат.`);
+        return;
+      }
+
+      let text = `📋 <b>Ваш список задач</b>:\n\n`;
+      tasks.forEach((t) => {
+        const icon = t.done ? "✅" : "⬜️";
+        text += `${icon} <b>#${t.id}</b> ${escapeHtml(t.text)}\n`;
+      });
+      text += `\n📊 <i>Всего: ${total} | Выполнено: ${done} | Осталось: ${pending}</i>`;
+
+      const inlineKeyboard = [];
+      tasks.forEach((t) => {
+        const icon = t.done ? "✅" : "⬜️";
+        inlineKeyboard.push([
+          { text: `${icon} #${t.id} ${t.text.slice(0, 24)}`, callback_data: `toggle:${t.id}` },
+          { text: "🗑️", callback_data: `del:${t.id}` },
+        ]);
+      });
+      inlineKeyboard.push([{ text: "🔄 Обновить список", callback_data: "refresh" }]);
+
+      appendChatMessage("bot", text, inlineKeyboard);
+    }
+
+    // ==============================================================
+    // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ФОРМАТИРОВАНИЯ
+    // ==============================================================
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function formatTelegramHtml(text) {
+      if (!text) return "";
+      // Преобразуем безопасные теги Telegram <b>, <i>, <code>
+      let res = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+      res = res.replace(/&lt;b&gt;(.*?)&lt;\/b&gt;/gi, "<b>$1</b>");
+      res = res.replace(/&lt;i&gt;(.*?)&lt;\/i&gt;/gi, "<i>$1</i>");
+      res = res.replace(/&lt;code&gt;(.*?)&lt;\/code&gt;/gi, "<code>$1</code>");
+      res = res.replace(/&lt;pre&gt;(.*?)&lt;\/pre&gt;/gi, "<pre>$1</pre>");
+
+      return res;
+    }
+
+    // ==============================================================
+    // ОБРАБОТЧИКИ СОБЫТИЙ ИНТЕРФЕЙСА
+    // ==============================================================
+    document.addEventListener("DOMContentLoaded", async () => {
+      // 1. Проверяем сервер и загружаем задачи
+      await checkServerStatus();
+      await fetchTasks();
+
+      // 2. Инициализируем приветствие в чате
+      sendBotMessageCommand("/start");
+
+      // 3. Переключение вкладок
+      document.querySelectorAll(".nav-tab").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".nav-tab").forEach((b) => b.classList.remove("active"));
+          document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
+
+          btn.classList.add("active");
+          const tabId = btn.dataset.tab;
+          document.getElementById(tabId).classList.add("active");
+        });
+      });
+
+      // 4. Переключение темы
+      themeBtn.addEventListener("click", () => {
+        state.theme = state.theme === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", state.theme);
+        localStorage.setItem("todo_theme", state.theme);
+        themeBtn.textContent = state.theme === "dark" ? "☀️" : "🌙";
+      });
+
+      // 5. Выбор пользователя
+      const userSelect = document.getElementById("userSelector");
+      userSelect.addEventListener("change", async (e) => {
+        if (e.target.value === "__new__") {
+          document.getElementById("newUserModal").classList.add("active");
+          document.getElementById("newUserIdInput").focus();
+          return;
+        }
+
+        state.userId = e.target.value;
+        localStorage.setItem("todo_user_id", state.userId);
+        updateBotSubtitle();
+        await fetchTasks();
+        showToast(`Профиль переключен: ${state.userId}`);
+        sendBotMessageCommand("/start");
+      });
+
+      // 6. Модальное окно нового пользователя
+      document.getElementById("modalCancelBtn").addEventListener("click", () => {
+        document.getElementById("newUserModal").classList.remove("active");
+        userSelect.value = state.userId;
+      });
+
+      document.getElementById("modalConfirmBtn").addEventListener("click", async () => {
+        const val = document.getElementById("newUserIdInput").value.trim();
+        if (val) {
+          state.userId = val;
+          localStorage.setItem("todo_user_id", state.userId);
+          document.getElementById("newUserModal").classList.remove("active");
+          document.getElementById("newUserIdInput").value = "";
+          await checkServerStatus();
+          await fetchTasks();
+          showToast(`Открыт профиль Telegram ID: ${state.userId}`);
+          sendBotMessageCommand("/start");
+        }
+      });
+
+      // 7. Отправка сообщения в чат
+      const chatForm = document.getElementById("tgChatForm");
+      const chatInput = document.getElementById("tgChatInput");
+      chatForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const text = chatInput.value.trim();
+        if (text) {
+          sendBotMessageCommand(text);
+          chatInput.value = "";
+        }
+      });
+
+      // 8. Кнопки быстрых команд в чате
+      document.querySelectorAll(".tg-chip").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          sendBotMessageCommand(chip.dataset.cmd);
+        });
+      });
+
+      // 9. Reply keyboard кнопки
+      document.querySelectorAll(".tg-reply-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          sendBotMessageCommand(btn.dataset.text);
+        });
+      });
+
+      // 10. Кнопки управления чатом
+      document.getElementById("btnChatRefresh").addEventListener("click", () => {
+        sendBotMessageCommand("/list");
+      });
+
+      document.getElementById("btnChatClear").addEventListener("click", () => {
+        const box = document.getElementById("tgMessages");
+        box.innerHTML = `<div class="tg-date-divider">Сегодня</div>`;
+        sendBotMessageCommand("/start");
+      });
+
+      // 11. Добавление задачи из Панели задач
+      const dashForm = document.getElementById("dashAddForm");
+      const dashInput = document.getElementById("dashTaskInput");
+      dashForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const text = dashInput.value.trim();
+        if (text) {
+          const task = await apiAddTask(text);
+          dashInput.value = "";
+          if (task) {
+            showToast(`Задача добавлена (ID: #${task.id}) ✅`);
+          }
+        }
+      });
+
+      // 12. Фильтры
+      document.querySelectorAll(".filter-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          state.currentFilter = btn.dataset.filter;
+          renderDashboard();
+        });
+      });
+
+      // 13. Поиск по задачам
+      const searchInput = document.getElementById("taskSearchInput");
+      searchInput.addEventListener("input", (e) => {
+        state.searchQuery = e.target.value.trim();
+        renderDashboard();
+      });
+
+      // 14. Очистить выполненные
+      document.getElementById("btnClearCompleted").addEventListener("click", async () => {
+        if (confirm("Удалить все выполненные задачи?")) {
+          const count = await apiClearCompleted();
+          showToast(`Удалено завершенных задач: ${count}`);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

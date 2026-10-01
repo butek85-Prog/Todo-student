@@ -111,6 +111,27 @@ def delete_task(task_id: int, user_id: str | int | None = None) -> bool:
     return False
 
 
+def edit_task(task_id: int, new_text: str, user_id: str | int | None = None) -> dict | None:
+    """Изменяет текст задачи по ID для конкретного пользователя."""
+    tasks = load_tasks(user_id)
+    for task in tasks:
+        if task.get("id") == task_id:
+            task["text"] = new_text.strip()
+            save_tasks(tasks, user_id)
+            return task
+    return None
+
+
+def clear_completed_tasks(user_id: str | int | None = None) -> int:
+    """Удаляет все выполненные задачи для конкретного пользователя и возвращает количество удаленных."""
+    tasks = load_tasks(user_id)
+    active_tasks = [t for t in tasks if not t.get("done")]
+    removed_count = len(tasks) - len(active_tasks)
+    if removed_count > 0:
+        save_tasks(active_tasks, user_id)
+    return removed_count
+
+
 # ===================== CLI РЕЖИМ =====================
 
 def get_prog_name() -> str:

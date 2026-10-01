@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Todo Mini App</title>
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Подключение стилей -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Панель для тестирования в обычном браузере (вне Telegram) -->
+  <div id="browser-banner" class="browser-banner hidden">
+    <div class="browser-banner-content">
+      <span class="browser-icon">🌐</span>
+      <span class="browser-text">Режим браузера. Текущий ID: <strong id="banner-user-id">local</strong></span>
+      <button id="switch-user-btn" class="banner-btn" title="Сменить ID">Сменить</button>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <!-- Шапка приложения -->
+    <header class="app-header">
+      <div class="user-profile">
+        <div class="avatar" id="user-avatar">📝</div>
+        <div class="user-details">
+          <h1 id="user-name">Мои задачи</h1>
+          <p id="user-subtitle" class="user-subtitle">Синхронизация с ботом</p>
+        </div>
+        <button id="refresh-btn" class="icon-btn" title="Обновить список" aria-label="Обновить">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Карточки статистики -->
+      <div class="stats-row">
+        <div class="stat-card" data-filter="all">
+          <div class="stat-number" id="stat-total">0</div>
+          <div class="stat-label">Всего</div>
+        </div>
+        <div class="stat-card active" data-filter="pending">
+          <div class="stat-number" id="stat-pending">0</div>
+          <div class="stat-label">В работе</div>
+        </div>
+        <div class="stat-card" data-filter="completed">
+          <div class="stat-number" id="stat-completed">0</div>
+          <div class="stat-label">Готово</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Поле быстрого добавления задачи -->
+    <section class="add-section">
+      <form id="add-task-form" class="add-form">
+        <input 
+          type="text" 
+          id="new-task-input" 
+          class="task-input" 
+          placeholder="Новая задача..." 
+          autocomplete="off"
+          maxlength="250"
+        />
+        <button type="submit" id="add-task-btn" class="add-btn" aria-label="Добавить задачу">
+          <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      </form>
+    </section>
+
+    <!-- Поиск и фильтрация -->
+    <section class="controls-section">
+      <div class="search-box">
+        <svg class="search-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="search-input" class="search-input" placeholder="Поиск по задачам..." />
+        <button id="clear-search-btn" class="clear-search-btn hidden" aria-label="Очистить поиск">&times;</button>
+      </div>
+
+      <div class="tabs-nav">
+        <button class="tab-btn active" data-tab="all">Все <span class="tab-badge" id="tab-badge-all">0</span></button>
+        <button class="tab-btn" data-tab="pending">В работе <span class="tab-badge" id="tab-badge-pending">0</span></button>
+        <button class="tab-btn" data-tab="completed">Готово <span class="tab-badge" id="tab-badge-completed">0</span></button>
+      </div>
+    </section>
+
+    <!-- Список задач -->
+    <main class="tasks-container">
+      <div id="loading-indicator" class="loading-state">
+        <div class="spinner"></div>
+        <p>Загрузка задач...</p>
+      </div>
+
+      <div id="empty-state" class="empty-state hidden">
+        <div class="empty-icon">🏖️</div>
+        <h3 id="empty-title">Дел пока нет!</h3>
+        <p id="empty-desc">Напишите новую задачу в поле выше или отправьте сообщение боту.</p>
+      </div>
+
+      <ul id="tasks-list" class="tasks-list">
+        <!-- Задачи генерируются динамически через JS -->
+      </ul>
+
+      <!-- Кнопка очистки выполненных -->
+      <div id="clear-completed-wrapper" class="clear-completed-wrapper hidden">
+        <button id="clear-completed-btn" class="clear-completed-btn">
+          🗑️ Очистить выполненные
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <!-- Всплывающие уведомления (Toast) -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Подключение скрипта приложения -->
+  <script src="app.js"></script>
+</body>
+</html>
