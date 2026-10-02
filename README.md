@@ -141,6 +141,56 @@ python todo.py help
 
 Для пересборки `todo.exe` используется PyInstaller:
 ```powershell
-pip install -r requirements.txt
+pip install -r requirements.txt pyinstaller
 pyinstaller --onefile --noconsole --distpath . --name todo todo.py
 ```
+
+---
+
+## ☁️ Бесплатный деплой на Render.com
+
+Проект полностью подготовлен для развёртывания на бесплатном тарифе хостинга **[Render.com](https://render.com/)**.
+
+### Шаг 1. Регистрация и подключение GitHub
+1. Перейдите на сайт **[render.com](https://render.com/)** и войдите через свой аккаунт **GitHub** (`butek85-Prog`).
+2. В панели управления Render нажмите **New +** в верхнем правом углу и выберите **Web Service**.
+
+### Шаг 2. Выбор репозитория
+1. В списке репозиториев найдите **`Todo-student`** и нажмите **Connect**.
+
+### Шаг 3. Параметры веб-сервиса
+Заполните параметры:
+- **Name**: `todo-student` (или любое другое имя)
+- **Region**: `Frankfurt (EU Central)` (рекомендуется)
+- **Branch**: `main`
+- **Runtime**: `Python 3`
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+- **Instance Type**: `Free` ($0/month)
+
+### Шаг 4. Переменные окружения (Environment Variables)
+Прокрутите вниз до блока **Environment Variables** и добавьте переменные:
+- `BOT_TOKEN` — ваш токен Telegram-бота (из `@BotFather`);
+- `DEFAULT_USER_ID` — `5265404800` (ваш Telegram ID);
+- `PYTHON_VERSION` — `3.11.9`.
+
+### Шаг 5. Запуск
+1. Нажмите **Deploy Web Service**.
+2. Render автоматически установит зависимости и запустит сервер `uvicorn main:app`.
+3. В логах отобразится:
+   ```
+   🤖 [Server Lifespan] Запуск Telegram-бота в фоновом режиме...
+   Бот @my_student_todo_bot успешно запущен!
+   INFO: Application startup complete.
+   ```
+4. Сверху появится постоянная ссылка на ваше приложение вида:
+   `https://todo-student-xxxx.onrender.com`
+
+### Шаг 6. Подключение Telegram Mini App (кнопка Меню)
+Чтобы открывать Todo прямо в Telegram с мобильного телефона:
+1. Откройте в Telegram бота `@BotFather`.
+2. Отправьте команду: `/setmenubutton`.
+3. Выберите `@my_student_todo_bot`.
+4. Вставьте ссылку: `https://<ваше-имя-на-render>.onrender.com/webapp`.
+5. Введите название кнопки: `📋 Задачи`.
+6. Добавьте в Environment Variables на Render переменную `WEBAPP_URL=https://<ваше-имя-на-render>.onrender.com`.
