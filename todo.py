@@ -5,6 +5,7 @@
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -28,10 +29,42 @@ else:
 
 TASKS_FILE = BASE_DIR / "tasks.json"
 USER_TASKS_DIR = BASE_DIR / "user_tasks"
+ENV_FILE = BASE_DIR / ".env"
+
+
+def load_env_file() -> None:
+    """Загружает переменные из .env файла в os.environ."""
+    if ENV_FILE.exists():
+        try:
+            with open(ENV_FILE, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        key, val = line.split("=", 1)
+                        key = key.strip()
+                        val = val.strip().strip("'\"")
+                        if key and key not in os.environ:
+                            os.environ[key] = val
+        except Exception:
+            pass
+
+
+load_env_file()
+
+
+def get_default_user_id() -> str | None:
+    """Возвращает ID пользователя по умолчанию из окружения (например, из .env)."""
+    uid = os.environ.get("DEFAULT_USER_ID")
+    if uid and uid.strip() and uid.strip().lower() not in ("local", "default"):
+        return uid.strip()
+    return None
 
 
 def get_tasks_file(user_id: str | int | None = None) -> Path:
     """Возвращает путь к файлу задач: либо общий tasks.json, либо персональный user_tasks/{user_id}.json."""
+    if user_id is None:
+        user_id = get_default_user_id()
+
     if user_id is None or str(user_id).lower() in ("local", "default"):
         return TASKS_FILE
     USER_TASKS_DIR.mkdir(parents=True, exist_ok=True)

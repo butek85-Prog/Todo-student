@@ -108,7 +108,8 @@ class TelegramBot:
                 return None
         except urllib.error.HTTPError as e:
             err_body = e.read().decode("utf-8", errors="ignore")
-            print(f"[API Ошибка HTTP {e.code}]: {err_body}", file=sys.stderr)
+            if "message is not modified" not in err_body and "query is too old" not in err_body:
+                print(f"[API Ошибка HTTP {e.code}]: {err_body}", file=sys.stderr)
             return None
         except (urllib.error.URLError, TimeoutError) as e:
             # При long polling таймаут — это нормальное явление
@@ -203,9 +204,12 @@ def format_tasks_view(user_id: int | str) -> tuple[str, dict]:
             {"text": "🗑️", "callback_data": f"del:{t.get('id')}"},
         ])
 
-    inline_keyboard.append([
-        {"text": "🔄 Обновить список", "callback_data": "refresh"},
-    ])
+    webapp_url = os.environ.get("WEBAPP_URL", "").strip()
+    bottom_row = [{"text": "🔄 Обновить список", "callback_data": "refresh"}]
+    if webapp_url.startswith("https://"):
+        bottom_row.append({"text": "🌐 Веб-приложение", "web_app": {"url": webapp_url}})
+
+    inline_keyboard.append(bottom_row)
 
     keyboard = {"inline_keyboard": inline_keyboard}
     return text, keyboard
@@ -213,11 +217,16 @@ def format_tasks_view(user_id: int | str) -> tuple[str, dict]:
 
 def get_main_reply_keyboard() -> dict:
     """Главная клавиатура внизу экрана."""
+    webapp_url = os.environ.get("WEBAPP_URL", "").strip()
+    keyboard = [
+        [{"text": "📋 Список задач"}, {"text": "➕ Добавить задачу"}],
+    ]
+    if webapp_url.startswith("https://"):
+        keyboard.append([{"text": "🌐 Открыть веб-приложение", "web_app": {"url": webapp_url}}])
+    keyboard.append([{"text": "ℹ️ Помощь"}])
+
     return {
-        "keyboard": [
-            [{"text": "📋 Список задач"}, {"text": "➕ Добавить задачу"}],
-            [{"text": "ℹ️ Помощь"}],
-        ],
+        "keyboard": keyboard,
         "resize_keyboard": True,
     }
 
@@ -477,15 +486,25 @@ def run_bot() -> None:
                 offset = max(offset, update_id + 1)
 
                 if "message" in update:
-                    handle_message(bot, update["message"], pending_add)
+                    msg = update["message"]
+                    sender = msg.get("from", {}).get("username") or msg.get("from", {}).get("first_name", "User")
+                    uid = msg.get("from", {}).get("id")
+                    txt = msg.get("text", "")
+                    print(f"[{time.strftime('%H:%M:%S')}] Сообщение от @{sender} (ID: {uid}): {txt}", flush=True)
+                    handle_message(bot, msg, pending_add)
                 elif "callback_query" in update:
-                    handle_callback_query(bot, update["callback_query"])
+                    cb = update["callback_query"]
+                    sender = cb.get("from", {}).get("username") or cb.get("from", {}).get("first_name", "User")
+                    uid = cb.get("from", {}).get("id")
+                    data = cb.get("data", "")
+                    print(f"[{time.strftime('%H:%M:%S')}] Кнопка от @{sender} (ID: {uid}): {data}", flush=True)
+                    handle_callback_query(bot, cb)
 
         except KeyboardInterrupt:
-            print("\nОстановка бота по запросу пользователя.")
+            print("\nОстановка бота по запросу пользователя.", flush=True)
             break
         except Exception as e:
-            print(f"Неожиданная ошибка в цикле: {e}", file=sys.stderr)
+            print(f"Неожиданная ошибка в цикле: {e}", file=sys.stderr, flush=True)
             time.sleep(3)
 
 
