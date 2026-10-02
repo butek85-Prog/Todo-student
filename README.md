@@ -14,6 +14,8 @@
 
 ```text
 todo-student/
+├── main.py               # Основное ASGI/FastAPI приложение для сервера (Uvicorn)
+├── Procfile              # Конфигурация запуска для Render, Railway, Heroku
 ├── todo.exe              # Автономное оконное приложение для Windows
 ├── todo.py               # Ядро задач и логика (GUI + CLI)
 ├── bot.py                # Telegram-бот с персональными базами задач
@@ -24,18 +26,33 @@ todo-student/
 ├── run_all.bat           # Запуск бота и веб-интерфейса в один клик
 ├── run_bot.bat           # Быстрый запуск Telegram-бота
 ├── run_web.bat           # Быстрый запуск веб-приложения
+├── run_server_uvicorn.bat# Локальный запуск сервера Uvicorn
 ├── .env                  # Локальные секреты и настройки (добавлен в .gitignore)
 ├── .env.example          # Шаблон конфигурации для репозитория
 ├── .gitignore            # Исключение конфиденциальных и временных файлов
 ├── tasks.json            # База задач по умолчанию
 ├── user_tasks/           # Индивидуальные базы задач пользователей Telegram (<id>.json)
-├── requirements.txt      # Зависимости для сборки EXE (PyInstaller)
+├── requirements.txt      # Зависимости проекта (FastAPI, Uvicorn, PyInstaller)
 └── README.md             # Документация проекта
 ```
 
 ---
 
-## 🚀 Быстрый запуск
+## ☁️ Развёртывание на сервере (Render, Railway, VPS)
+
+Команда запуска сервера (через Uvicorn):
+```bash
+uvicorn main:app --host 0.0.0.0 --port $PORT
+```
+
+### Преимущества запуска через `main:app`:
+- **Единый сервис**: в одном процессе запускается быстрый асинхронный сервер FastAPI и одновременно стартует Telegram-бот в фоне (через FastAPI lifespan);
+- **Автоматический порт `$PORT`**: полностью совместимо с Render, Railway, Heroku, Dokku, Fly.io;
+- **Раздача статики и API**: отдает и веб-интерфейс ([index.html](file:///c:/Users/butek/todo-student/index.html)), и Telegram Mini App ([webapp/](file:///c:/Users/butek/todo-student/webapp)), и все REST эндпоинты `/api/tasks`.
+
+---
+
+## 🚀 Локальный запуск
 
 ### Единый запуск (Бот + Веб-интерфейс):
 Просто запустите файл **`run_all.bat`** (двойным кликом в Проводнике Windows).  
