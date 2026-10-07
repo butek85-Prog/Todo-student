@@ -2,10 +2,25 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, height=device-height">
   <title>Todo Mini App</title>
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    // Мгновенное разворачивание на весь экран
+    try {
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+        if (typeof window.Telegram.WebApp.requestFullscreen === "function") {
+          window.Telegram.WebApp.requestFullscreen();
+        }
+        if (typeof window.Telegram.WebApp.disableVerticalSwipes === "function") {
+          window.Telegram.WebApp.disableVerticalSwipes();
+        }
+      }
+    } catch (e) {}
+  </script>
   <!-- Подключение стилей -->
   <link rel="stylesheet" href="style.css">
 </head>

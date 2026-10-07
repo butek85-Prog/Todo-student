@@ -87,9 +87,36 @@ function initUser() {
   if (tg) {
     tg.ready();
     tg.expand();
+
+    // Запрос полноэкранного режима для Bot API 8.0+
+    if (typeof tg.requestFullscreen === "function") {
+      try {
+        tg.requestFullscreen();
+      } catch (e) {}
+    }
+
+    // Отключение вертикального смахивания (чтобы окно не сворачивалось при скролле)
+    if (typeof tg.disableVerticalSwipes === "function") {
+      try {
+        tg.disableVerticalSwipes();
+      } catch (e) {}
+    }
+
     try {
       tg.enableClosingConfirmation();
     } catch (e) {}
+
+    // Синхронизация реальной высоты окна Telegram с CSS-переменными
+    const syncViewportHeight = () => {
+      const vh = tg.viewportHeight ? `${tg.viewportHeight}px` : `${window.innerHeight}px`;
+      document.documentElement.style.setProperty("--tg-viewport-height", vh);
+      document.documentElement.style.setProperty("--app-height", vh);
+    };
+    syncViewportHeight();
+
+    if (typeof tg.onEvent === "function") {
+      tg.onEvent("viewportChanged", syncViewportHeight);
+    }
   }
 
   // 1. Проверяем данные от Telegram WebApp
