@@ -828,6 +828,21 @@
       background: var(--danger-light);
     }
 
+    .task-reminder-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-light);
+      border: 1px solid var(--border-color);
+      padding: 2px 7px;
+      border-radius: 6px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
     .empty-state {
       text-align: center;
       padding: 48px 16px;
@@ -1433,15 +1448,24 @@
     // ==============================================================
     // ОПЕРАЦИИ С ЗАДАЧАМИ (API / OFFLINE)
     // ==============================================================
-    async function apiAddTask(text) {
+    async function apiAddTask(text, reminder = null) {
       if (!text.trim()) return null;
+
+      let cleanText = text.trim();
+      let remVal = reminder;
+      if (!remVal && (cleanText.includes(" -r ") || cleanText.includes(" --remind "))) {
+        const sep = cleanText.includes(" -r ") ? " -r " : " --remind ";
+        const parts = cleanText.split(sep);
+        cleanText = parts[0].trim();
+        remVal = parts[1].trim();
+      }
 
       if (state.isServerOnline) {
         try {
           const res = await fetch("/api/tasks", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text, user_id: state.userId }),
+            body: JSON.stringify({ text: cleanText, user_id: state.userId, reminder: remVal }),
           });
           const data = await res.json();
           if (data.ok) {
@@ -1455,10 +1479,38 @@
 
       // Офлайн
       const newId = state.tasks.reduce((max, t) => Math.max(max, t.id || 0), 0) + 1;
-      const newTask = { id: newId, text: text.trim(), done: false };
+      const newTask = { id: newId, text: cleanText, done: false, reminder: remVal };
       state.tasks.push(newTask);
       saveTasksOffline();
       return newTask;
+    }
+
+    async function apiSetReminder(taskId, reminderText) {
+      if (state.isServerOnline) {
+        try {
+          const res = await fetch(`/api/tasks/${taskId}/reminder`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reminder: reminderText, user_id: state.userId }),
+          });
+          const data = await res.json();
+          if (data.ok) {
+            await fetchTasks();
+            return data.task;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      const task = state.tasks.find((t) => t.id === taskId);
+      if (task) {
+        task.reminder = reminderText && reminderText !== "отмена" ? reminderText : null;
+        saveTasksOffline();
+        renderDashboard();
+        return task;
+      }
+      return null;
     }
 
     async function apiToggleTask(taskId) {
@@ -1624,13 +1676,18 @@
         item.className = `task-item ${task.done ? "completed" : ""}`;
         item.dataset.id = task.id;
 
+        const remBadge = task.reminder
+          ? `<span class="task-reminder-badge">⏰ ${escapeHtml(task.reminder)}</span>`
+          : "";
+
         item.innerHTML = `
           <button class="task-checkbox-btn" title="${task.done ? 'Вернуть в работу' : 'Отметить выполненной'}">
             ${task.done ? "✓" : ""}
           </button>
           <span class="task-id-badge">#${task.id}</span>
-          <div class="task-text">${escapeHtml(task.text)}</div>
+          <div class="task-text">${escapeHtml(task.text)}${remBadge}</div>
           <div class="task-actions">
+            <button class="btn-task-action remind" title="Напоминание">⏰</button>
             <button class="btn-task-action edit" title="Редактировать">✏️</button>
             <button class="btn-task-action delete" title="Удалить">🗑️</button>
           </div>
@@ -1641,6 +1698,20 @@
           const updated = await apiToggleTask(task.id);
           if (updated) {
             showToast(updated.done ? `Задача #${task.id} выполнена ✅` : `Задача #${task.id} возвращена ⬜️`);
+          }
+        });
+
+        // Напоминание
+        item.querySelector(".btn-task-action.remind").addEventListener("click", async () => {
+          const promptMsg = task.reminder
+            ? `Текущее напоминание: ${task.reminder}\n\nВведите новое время (напр. 15m, 1h, 18:00, завтра 09:00) или 'отмена':`
+            : "Введите время напоминания:\n(например: 15m, 1h, 18:00, завтра 09:30, 2026-10-08 14:00)";
+          const ans = prompt(promptMsg, task.reminder || "18:00");
+          if (ans !== null && ans.trim()) {
+            const updated = await apiSetReminder(task.id, ans.trim());
+            if (updated) {
+              showToast(updated.reminder ? "⏰ Напоминание сохранено!" : "Напоминание выключено");
+            }
           }
         });
 
@@ -1867,6 +1938,21 @@
             appendChatMessage("bot", `❌ Задача с ID #${id} не найдена.`);
           }
         }
+      } else if (cmd.startsWith("/remind") || cmd.startsWith("/rem")) {
+        const parts = cmd.split(/\s+/);
+        if (parts.length >= 3) {
+          const id = parseInt(parts[1]);
+          const remVal = parts.slice(2).join(" ");
+          const updated = await apiSetReminder(id, remVal);
+          if (updated) {
+            appendChatMessage("bot", `⏰ Напоминание для задачи #${id}: <b>${escapeHtml(updated.reminder || "выключено")}</b>`);
+            showOfflineTaskListMessage();
+          } else {
+            appendChatMessage("bot", `❌ Не удалось установить напоминание для задачи #${id}.`);
+          }
+        } else {
+          appendChatMessage("bot", "⚠️ Пример: <code>/remind 1 18:00</code> или <code>/remind 1 15m</code>");
+        }
       } else if (cmd.startsWith("/delete") || cmd.startsWith("/del")) {
         const id = parseInt(cmd.replace(/\/delete|\/del/, "").trim());
         if (id) {
@@ -1900,15 +1986,18 @@
       let text = `📋 <b>Ваш список задач</b>:\n\n`;
       tasks.forEach((t) => {
         const icon = t.done ? "✅" : "⬜️";
-        text += `${icon} <b>#${t.id}</b> ${escapeHtml(t.text)}\n`;
+        const remStr = t.reminder ? ` <i>(⏰ ${escapeHtml(t.reminder)})</i>` : "";
+        text += `${icon} <b>#${t.id}</b> ${escapeHtml(t.text)}${remStr}\n`;
       });
       text += `\n📊 <i>Всего: ${total} | Выполнено: ${done} | Осталось: ${pending}</i>`;
 
       const inlineKeyboard = [];
       tasks.forEach((t) => {
         const icon = t.done ? "✅" : "⬜️";
+        const remIcon = t.reminder ? "⏰" : "⏱️";
         inlineKeyboard.push([
-          { text: `${icon} #${t.id} ${t.text.slice(0, 24)}`, callback_data: `toggle:${t.id}` },
+          { text: `${icon} #${t.id} ${t.text.slice(0, 20)}`, callback_data: `toggle:${t.id}` },
+          { text: remIcon, callback_data: `rem_menu:${t.id}` },
           { text: "🗑️", callback_data: `del:${t.id}` },
         ]);
       });

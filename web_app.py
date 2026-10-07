@@ -27,7 +27,7 @@ if str(BASE_DIR) not in sys.path:
 import todo
 
 try:
-    from bot import format_tasks_view, get_main_reply_keyboard
+    from bot import format_tasks_view, get_main_reply_keyboard, format_reminder_menu
 except Exception:
     def format_tasks_view(user_id=None):
         tasks = todo.load_tasks(user_id)
@@ -41,18 +41,57 @@ except Exception:
         text_lines = [f"📋 <b>Ваш список задач</b> (ID: <code>{display_id}</code>):\n"]
         for t in tasks:
             icon = "✅" if t.get("done") else "⬜️"
-            text_lines.append(f"{icon} <b>#{t.get('id')}</b> {html.escape(t.get('text', ''))}")
+            rem_str = ""
+            if t.get("reminder"):
+                disp = todo.format_reminder_display(t.get("reminder"))
+                rem_str = f" <i>(⏰ {disp})</i>"
+            text_lines.append(f"{icon} <b>#{t.get('id')}</b> {html.escape(t.get('text', ''))}{rem_str}")
         text_lines.append(f"\n📊 <i>Всего: {total} | Выполнено: {done_count} | Осталось: {pending_count}</i>")
         inline_keyboard = []
         for t in tasks:
             status_icon = "✅" if t.get("done") else "⬜️"
-            btn_text = f"{status_icon} #{t.get('id')} {t.get('text', '')[:25]}"
+            btn_text = f"{status_icon} #{t.get('id')} {t.get('text', '')[:20]}"
+            rem_icon = "⏰" if t.get("reminder") else "⏱️"
             inline_keyboard.append([
                 {"text": btn_text, "callback_data": f"toggle:{t.get('id')}"},
+                {"text": rem_icon, "callback_data": f"rem_menu:{t.get('id')}"},
                 {"text": "🗑️", "callback_data": f"del:{t.get('id')}"},
             ])
         inline_keyboard.append([{"text": "🔄 Обновить список", "callback_data": "refresh"}])
         return "\n".join(text_lines), {"inline_keyboard": inline_keyboard}
+
+    def format_reminder_menu(task_id: int, user_id=None):
+        tasks = todo.load_tasks(user_id)
+        task = next((t for t in tasks if t.get("id") == task_id), None)
+        if not task:
+            return "❌ Задача не найдена.", {"inline_keyboard": [[{"text": "🔙 К списку", "callback_data": "refresh"}]]}
+        curr_rem = todo.format_reminder_display(task.get("reminder")) if task.get("reminder") else "не установлено"
+        text = (
+            f"⏰ <b>Напоминание для задачи #{task_id}</b>\n\n"
+            f"📌 «{html.escape(task.get('text', ''))}»\n"
+            f"Текущее напоминание: <b>{curr_rem}</b>\n\n"
+            "Выберите быстрый интервал или задайте командой:\n"
+            f"<code>/remind {task_id} 18:00</code>"
+        )
+        kb = [
+            [
+                {"text": "⏱ +15 минут", "callback_data": f"set_rem:{task_id}:15m"},
+                {"text": "⏱ +1 час", "callback_data": f"set_rem:{task_id}:1h"},
+            ],
+            [
+                {"text": "⏱ +3 часа", "callback_data": f"set_rem:{task_id}:3h"},
+                {"text": "📅 Сегодня 18:00", "callback_data": f"set_rem:{task_id}:today_18"},
+            ],
+            [
+                {"text": "📅 Завтра 09:00", "callback_data": f"set_rem:{task_id}:tomorrow_09"},
+                {"text": "📅 Завтра 18:00", "callback_data": f"set_rem:{task_id}:tomorrow_18"},
+            ],
+            [
+                {"text": "❌ Отключить", "callback_data": f"set_rem:{task_id}:cancel"},
+                {"text": "🔙 Назад", "callback_data": "refresh"},
+            ],
+        ]
+        return text, {"inline_keyboard": kb}
 
     def get_main_reply_keyboard():
         return {
@@ -228,6 +267,7 @@ class TodoWebHandler(http.server.BaseHTTPRequestHandler):
         if path == "/api/tasks":
             text = body.get("text", "").strip()
             user_id = body.get("user_id")
+            reminder = body.get("reminder")
             if user_id in ("default", "", "null"):
                 user_id = None
 
@@ -235,8 +275,24 @@ class TodoWebHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "error": "Текст задачи не может быть пустым"}, status=400)
                 return
 
-            task = todo.add_task(text, user_id=user_id)
+            task = todo.add_task(text, user_id=user_id, reminder=reminder)
             self.send_json({"ok": True, "task": task, "user_id": user_id or "default"})
+            return
+
+        # API: Установить напоминание
+        match_rem = re.match(r"^/api/tasks/(\d+)/reminder$", path)
+        if match_rem:
+            task_id = int(match_rem.group(1))
+            rem_val = body.get("reminder")
+            user_id = body.get("user_id")
+            if user_id in ("default", "", "null"):
+                user_id = None
+
+            task = todo.set_task_reminder(task_id, rem_val, user_id=user_id)
+            if task:
+                self.send_json({"ok": True, "task": task, "user_id": user_id or "default"})
+            else:
+                self.send_json({"ok": False, "error": "Неверный формат времени или задача не найдена"}, status=400)
             return
 
         # API: Переключить статус задачи
@@ -270,20 +326,17 @@ class TodoWebHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "error": f"Задача #{task_id} не найдена"}, status=404)
             return
 
-        # API: Редактировать текст задачи
+        # API: Редактировать текст или напоминание задачи
         match_edit = re.match(r"^/api/tasks/(\d+)/edit$", path)
         if match_edit:
             task_id = int(match_edit.group(1))
-            new_text = body.get("text", "").strip()
+            new_text = body.get("text")
+            new_rem = body.get("reminder")
             user_id = body.get("user_id")
             if user_id in ("default", "", "null"):
                 user_id = None
 
-            if not new_text:
-                self.send_json({"ok": False, "error": "Текст задачи не может быть пустым"}, status=400)
-                return
-
-            task = todo.edit_task(task_id, new_text, user_id=user_id)
+            task = todo.edit_task(task_id, new_text=new_text, reminder=new_rem, user_id=user_id)
             if task:
                 self.send_json({"ok": True, "task": task, "user_id": user_id or "default"})
             else:
@@ -323,7 +376,8 @@ class TodoWebHandler(http.server.BaseHTTPRequestHandler):
                     "🔒 <b>Все задачи хранятся индивидуально для вашего профиля.</b>\n\n"
                     "📌 <b>Что я умею:</b>\n"
                     "• 📋 <code>/list</code> — показать ваш персональный список задач\n"
-                    "• ➕ <code>/add &lt;текст&gt;</code> — добавить задачу\n"
+                    "• ➕ <code>/add &lt;текст&gt; [-r &lt;время&gt;]</code> — добавить задачу\n"
+                    "• ⏰ <code>/remind &lt;id&gt; &lt;время&gt;</code> — настроить напоминание\n"
                     "• ✅ <code>/done &lt;id&gt;</code> — отметить выполненной\n"
                     "• 🗑️ <code>/delete &lt;id&gt;</code> — удалить задачу\n"
                     "• ℹ️ <code>/help</code> — показать справку\n\n"
@@ -342,7 +396,8 @@ class TodoWebHandler(http.server.BaseHTTPRequestHandler):
                 help_text = (
                     f"📖 <b>Справка (ID профиля: <code>{effective_id_str}</code>):</b>\n\n"
                     "• <b>/list</b> (кнопка «📋 Список задач») — выводит ваш персональный список с интерактивными кнопками;\n"
-                    "• <b>/add &lt;текст&gt;</b> — добавляет задачу в список;\n"
+                    "• <b>/add &lt;текст&gt; [-r &lt;время&gt;]</b> — добавляет задачу в список;\n"
+                    "• <b>/remind &lt;номер&gt; &lt;время&gt;</b> — установить напоминание (напр. <code>/remind 1 18:00</code> или <code>15m</code>);\n"
                     "• <b>/done &lt;номер&gt;</b> — отмечает задачу выполненной;\n"
                     "• <b>/delete &lt;номер&gt;</b> — удаляет задачу;\n"
                     "• <b>Обычный текст</b> — просто напишите боту задачу (например: <i>Купить молоко</i>), и она будет добавлена."
@@ -365,6 +420,53 @@ class TodoWebHandler(http.server.BaseHTTPRequestHandler):
                     "await_task_text": True,
                 })
 
+            # Команда /remind <id> <время>
+            elif raw_text.startswith("/remind") or raw_text.startswith("/rem"):
+                parts = raw_text.split(maxsplit=2)
+                if len(parts) < 3:
+                    messages.append({
+                        "text": (
+                            "⚠️ Укажите ID задачи и время напоминания.\n\n"
+                            "Примеры:\n"
+                            "• <code>/remind 1 18:00</code>\n"
+                            "• <code>/remind 1 15m</code>\n"
+                            "• <code>/remind 1 завтра 09:30</code>\n"
+                            "• <code>/remind 1 отмена</code>"
+                        ),
+                        "inline_keyboard": [],
+                    })
+                else:
+                    try:
+                        task_id = int(parts[1])
+                        rem_val = parts[2].strip()
+                        updated = todo.set_task_reminder(task_id, rem_val, user_id=user_id)
+                        if updated is None:
+                            messages.append({
+                                "text": f"❌ Не удалось распознать время «{html.escape(rem_val)}» или задача #{task_id} не найдена.",
+                                "inline_keyboard": [],
+                            })
+                        elif updated.get("reminder"):
+                            disp = todo.format_reminder_display(updated.get("reminder"))
+                            messages.append({
+                                "text": f"⏰ Напоминание для задачи #{task_id} установлено: <b>{disp}</b>",
+                                "inline_keyboard": [],
+                            })
+                        else:
+                            messages.append({
+                                "text": f"Напоминание для задачи #{task_id} отключено.",
+                                "inline_keyboard": [],
+                            })
+                        view_text, markup = format_tasks_view(user_id)
+                        messages.append({
+                            "text": view_text,
+                            "inline_keyboard": markup.get("inline_keyboard", []),
+                        })
+                    except ValueError:
+                        messages.append({
+                            "text": "⚠️ ID задачи должен быть числом.\nПример: <code>/remind 1 18:00</code>",
+                            "inline_keyboard": [],
+                        })
+
             # Команда /add <текст>
             elif raw_text.startswith("/add"):
                 parts = raw_text.split(maxsplit=1)
@@ -374,10 +476,18 @@ class TodoWebHandler(http.server.BaseHTTPRequestHandler):
                         "inline_keyboard": [],
                     })
                 else:
-                    task = todo.add_task(parts[1].strip(), user_id=user_id)
+                    raw_add = parts[1].strip()
+                    rem_val = None
+                    if " -r " in raw_add or " --remind " in raw_add:
+                        match = re.search(r"\s+(-r|--remind)\s+(.+)$", raw_add)
+                        if match:
+                            rem_val = match.group(2).strip()
+                            raw_add = raw_add[:match.start()].strip()
+                    task = todo.add_task(raw_add, user_id=user_id, reminder=rem_val)
                     view_text, markup = format_tasks_view(user_id)
+                    rem_info = f" (⏰ {todo.format_reminder_display(task.get('reminder'))})" if task.get("reminder") else ""
                     messages.append({
-                        "text": f"✅ Задача добавлена в список (<b>ID: #{task['id']}</b>):\n«{html.escape(task['text'])}»",
+                        "text": f"✅ Задача добавлена в список (<b>ID: #{task['id']}</b>):\n«{html.escape(task['text'])}»{rem_info}",
                         "inline_keyboard": [],
                     })
                     messages.append({
@@ -507,6 +617,44 @@ class TodoWebHandler(http.server.BaseHTTPRequestHandler):
 
             elif callback_data == "prompt_add":
                 toast_text = "Напишите текст задачи в чат"
+
+            elif callback_data.startswith("rem_menu:"):
+                try:
+                    task_id = int(callback_data.split(":")[1])
+                    view_text, markup = format_reminder_menu(task_id, user_id)
+                    self.send_json({
+                        "ok": True,
+                        "toast": "Настройка напоминания ⏰",
+                        "view_text": view_text,
+                        "inline_keyboard": markup.get("inline_keyboard", []),
+                        "user_id": user_id or "default",
+                    })
+                    return
+                except Exception:
+                    toast_text = "Ошибка открытия меню"
+
+            elif callback_data.startswith("set_rem:"):
+                try:
+                    parts = callback_data.split(":")
+                    task_id = int(parts[1])
+                    preset = parts[2]
+                    preset_map = {
+                        "15m": "15m",
+                        "1h": "1h",
+                        "3h": "3h",
+                        "today_18": "сегодня 18:00",
+                        "tomorrow_09": "завтра 09:00",
+                        "tomorrow_18": "завтра 18:00",
+                        "cancel": "отмена",
+                    }
+                    val = preset_map.get(preset, preset)
+                    updated = todo.set_task_reminder(task_id, val, user_id=user_id)
+                    if updated and updated.get("reminder"):
+                        toast_text = f"⏰ Напоминание: {todo.format_reminder_display(updated.get('reminder'))}"
+                    else:
+                        toast_text = "Напоминание выключено"
+                except Exception:
+                    toast_text = "Ошибка настройки"
 
             view_text, markup = format_tasks_view(user_id)
 

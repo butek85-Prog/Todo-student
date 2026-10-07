@@ -168,13 +168,26 @@ async function handleAddTask(e) {
     tg.MainButton.hide();
   }
 
+  let cleanText = text;
+  let reminderVal = null;
+  if (text.includes(" -r ")) {
+    const parts = text.split(" -r ");
+    cleanText = parts[0].trim();
+    reminderVal = parts[1].trim();
+  } else if (text.includes(" --remind ")) {
+    const parts = text.split(" --remind ");
+    cleanText = parts[0].trim();
+    reminderVal = parts[1].trim();
+  }
+
   try {
     const res = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: jsonStringifyWithUtf8({
         user_id: state.userId,
-        text: text,
+        text: cleanText,
+        reminder: reminderVal,
       }),
     });
 
@@ -184,7 +197,8 @@ async function handleAddTask(e) {
     if (data.ok && data.task) {
       state.tasks.push(data.task);
       render();
-      showToast("✅ Задача добавлена!");
+      const remInfo = data.task.reminder ? " (с напоминанием ⏰)" : "";
+      showToast(`✅ Задача добавлена!${remInfo}`);
       triggerHaptic("success");
     }
   } catch (err) {
@@ -306,6 +320,75 @@ async function handleClearCompleted() {
 }
 
 /**
+ * Форматирование напоминания для отображения бейджа
+ */
+function formatReminderBadge(reminderStr) {
+  if (!reminderStr) return null;
+  try {
+    const parts = reminderStr.split(" ");
+    const [y, m, d] = parts[0].split("-");
+    const time = parts[1] || "";
+    const remDate = new Date(`${parts[0]}T${time}:00`);
+    const now = new Date();
+    const isPast = remDate < now;
+
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+
+    let text = `${d}.${m} ${time}`;
+    if (parts[0] === todayStr) text = `Сегодня ${time}`;
+    else if (parts[0] === tomStr) text = `Завтра ${time}`;
+    return { text, isPast };
+  } catch (e) {
+    return { text: reminderStr, isPast: false };
+  }
+}
+
+/**
+ * Установка или изменение напоминания для задачи
+ */
+async function handleSetReminder(taskId, currentReminder, event) {
+  if (event) event.stopPropagation();
+  triggerHaptic("selection");
+
+  const promptMsg = currentReminder
+    ? `Текущее напоминание: ${currentReminder}\n\nВведите новое время (напр. 15m, 1h, 18:00, завтра 09:00) или 'отмена' для выключения:`
+    : "Введите время напоминания:\n(например: 15m, 1h, 18:00, завтра 09:30, 2026-10-08 14:00)";
+
+  const ans = prompt(promptMsg, currentReminder || "18:00");
+  if (ans === null) return;
+
+  try {
+    const res = await fetch(`/api/tasks/${taskId}/reminder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: state.userId,
+        reminder: ans.trim(),
+      }),
+    });
+
+    if (!res.ok) throw new Error("Ошибка обновления напоминания");
+    const data = await res.json();
+    if (data.ok && data.task) {
+      const idx = state.tasks.findIndex((t) => t.id === taskId);
+      if (idx !== -1) {
+        state.tasks[idx] = data.task;
+        render();
+      }
+      showToast(data.task.reminder ? `⏰ Напоминание установлено!` : "Напоминание выключено");
+      triggerHaptic("success");
+    }
+  } catch (err) {
+    console.error("Ошибка при установке напоминания:", err);
+    showToast("❌ Ошибка при установке времени");
+    triggerHaptic("error");
+  }
+}
+
+/**
  * Вспомогательный метод кодирования JSON
  */
 function jsonStringifyWithUtf8(obj) {
@@ -391,11 +474,27 @@ function render() {
       // Тело задачи
       const body = document.createElement("div");
       body.className = "task-body";
+      let remHtml = "";
+      if (task.reminder) {
+        const remInfo = formatReminderBadge(task.reminder);
+        if (remInfo) {
+          remHtml = `<span class="task-reminder-badge ${remInfo.isPast ? "past" : ""}">⏰ ${remInfo.text}</span>`;
+        }
+      }
       body.innerHTML = `
         <span class="task-id-badge">#${task.id}</span>
         <span class="task-text">${escapeHtml(task.text)}</span>
+        ${remHtml}
       `;
       body.addEventListener("click", () => handleToggleTask(task.id));
+
+      // Кнопка напоминания
+      const remindBtn = document.createElement("button");
+      remindBtn.className = `remind-btn ${task.reminder ? "active" : ""}`;
+      remindBtn.setAttribute("title", task.reminder ? "Изменить напоминание" : "Установить напоминание");
+      remindBtn.setAttribute("aria-label", "Напоминание");
+      remindBtn.innerHTML = task.reminder ? "⏰" : "⏱️";
+      remindBtn.addEventListener("click", (e) => handleSetReminder(task.id, task.reminder, e));
 
       // Кнопка удаления
       const deleteBtn = document.createElement("button");
@@ -414,6 +513,7 @@ function render() {
 
       li.appendChild(checkWrapper);
       li.appendChild(body);
+      li.appendChild(remindBtn);
       li.appendChild(deleteBtn);
       elements.tasksContainer.appendChild(li);
     });

@@ -168,7 +168,8 @@ def api_create_task(payload: dict = Body(...)):
         raise HTTPException(status_code=400, detail="Текст задачи не может быть пустым")
 
     user_id = get_effective_user_id(payload.get("user_id"))
-    new_task = todo.add_task(text, user_id=user_id)
+    reminder = payload.get("reminder")
+    new_task = todo.add_task(text, user_id=user_id, reminder=reminder)
     return {
         "ok": True,
         "task": new_task,
@@ -200,18 +201,31 @@ def api_toggle_task_body(payload: dict = Body(...)):
     return {"ok": True, "task": updated, "user_id": user_id or "default"}
 
 
+# Установка напоминания
+@app.post("/api/tasks/{task_id}/reminder")
+def api_set_task_reminder(task_id: int, payload: dict = Body(...)):
+    """Установка или сброс напоминания задачи."""
+    user_id = get_effective_user_id(payload.get("user_id"))
+    reminder_val = payload.get("reminder")
+    updated = todo.set_task_reminder(task_id, reminder_val, user_id=user_id)
+    if updated is None:
+        raise HTTPException(status_code=400, detail="Неверный формат времени или задача не найдена")
+    return {"ok": True, "task": updated, "user_id": user_id or "default"}
+
+
 # Редактирование задачи
 @app.post("/api/tasks/{task_id}/edit")
 @app.put("/api/tasks/{task_id}")
 def api_edit_task(task_id: int, payload: dict = Body(...)):
-    """Изменение текста или статуса задачи."""
+    """Изменение текста, напоминания или статуса задачи."""
     user_id = get_effective_user_id(payload.get("user_id"))
     new_text = payload.get("text")
     is_done = payload.get("done")
+    new_rem = payload.get("reminder")
 
     task = None
-    if new_text is not None and hasattr(todo, "edit_task"):
-        task = todo.edit_task(task_id, str(new_text), user_id=user_id)
+    if (new_text is not None or new_rem is not None) and hasattr(todo, "edit_task"):
+        task = todo.edit_task(task_id, new_text=new_text, reminder=new_rem, user_id=user_id)
     if is_done is not None:
         task = todo.set_task_done(task_id, bool(is_done), user_id=user_id)
 
@@ -224,6 +238,7 @@ def api_edit_task(task_id: int, payload: dict = Body(...)):
         raise HTTPException(status_code=404, detail=f"Задача #{task_id} не найдена")
 
     return {"ok": True, "task": task, "user_id": user_id or "default"}
+
 
 
 # Удаление задачи: 2 формата (DELETE /:id и POST /delete)
@@ -283,11 +298,44 @@ def api_bot_chat(payload: dict = Body(...)):
         )
     elif text.startswith("/list"):
         reply_text, _ = bot.format_tasks_view(user_id)
+    elif text.startswith("/remind") or text.startswith("/rem"):
+        parts = text.split(maxsplit=2)
+        if len(parts) < 3:
+            reply_text = (
+                "⚠️ Укажите ID задачи и время напоминания.\n\n"
+                "Примеры:\n"
+                "• <code>/remind 1 18:00</code>\n"
+                "• <code>/remind 1 15m</code>\n"
+                "• <code>/remind 1 завтра 09:30</code>\n"
+                "• <code>/remind 1 отмена</code>"
+            )
+        else:
+            try:
+                task_id = int(parts[1])
+                rem_val = parts[2].strip()
+                updated = todo.set_task_reminder(task_id, rem_val, user_id=user_id)
+                if updated is None:
+                    reply_text = f"❌ Не удалось распознать время «{html.escape(rem_val)}» или задача #{task_id} не найдена."
+                elif updated.get("reminder"):
+                    disp = todo.format_reminder_display(updated.get("reminder"))
+                    reply_text = f"⏰ Напоминание для #{task_id} установлено: <b>{disp}</b>"
+                else:
+                    reply_text = f"Напоминание для #{task_id} отключено."
+            except ValueError:
+                reply_text = "⚠️ ID задачи должен быть числом.\nПример: <code>/remind 1 18:00</code>"
     elif text.startswith("/add"):
         parts = text.split(maxsplit=1)
         if len(parts) > 1 and parts[1].strip():
-            task = todo.add_task(parts[1].strip(), user_id=user_id)
-            reply_text = f"✅ Задача добавлена (<b>ID: {task['id']}</b>):\n«{html.escape(task['text'])}»"
+            raw_add = parts[1].strip()
+            rem_val = None
+            if " -r " in raw_add or " --remind " in raw_add:
+                match = re.search(r"\s+(-r|--remind)\s+(.+)$", raw_add)
+                if match:
+                    rem_val = match.group(2).strip()
+                    raw_add = raw_add[:match.start()].strip()
+            task = todo.add_task(raw_add, user_id=user_id, reminder=rem_val)
+            rem_info = f" (⏰ {todo.format_reminder_display(task.get('reminder'))})" if task.get("reminder") else ""
+            reply_text = f"✅ Задача добавлена (<b>ID: {task['id']}</b>):\n«{html.escape(task['text'])}»{rem_info}"
         else:
             reply_text = "⚠️ Укажите текст задачи: <code>/add Текст</code>"
     else:
@@ -320,6 +368,34 @@ def api_bot_callback(payload: dict = Body(...)):
         tid = int(data.split(":")[1])
         todo.delete_task(tid, user_id=user_id)
         toast = f"Задача #{tid} удалена 🗑️"
+    elif data.startswith("rem_menu:"):
+        tid = int(data.split(":")[1])
+        view_text, markup = bot.format_reminder_menu(tid, user_id)
+        return {
+            "ok": True,
+            "toast": "Настройка напоминания",
+            "view_text": view_text,
+            "inline_keyboard": markup.get("inline_keyboard", []),
+        }
+    elif data.startswith("set_rem:"):
+        parts = data.split(":")
+        tid = int(parts[1])
+        preset = parts[2]
+        preset_map = {
+            "15m": "15m",
+            "1h": "1h",
+            "3h": "3h",
+            "today_18": "сегодня 18:00",
+            "tomorrow_09": "завтра 09:00",
+            "tomorrow_18": "завтра 18:00",
+            "cancel": "отмена",
+        }
+        val = preset_map.get(preset, preset)
+        t = todo.set_task_reminder(tid, val, user_id=user_id)
+        if t and t.get("reminder"):
+            toast = f"⏰ Установлено: {todo.format_reminder_display(t.get('reminder'))}"
+        else:
+            toast = "Напоминание выключено"
     elif data == "refresh":
         toast = "Список обновлён 🔄"
 
@@ -328,7 +404,9 @@ def api_bot_callback(payload: dict = Body(...)):
         "ok": True,
         "toast": toast,
         "view": view_text,
+        "view_text": view_text,
         "markup": markup,
+        "inline_keyboard": markup.get("inline_keyboard", []),
     }
 
 

@@ -9,6 +9,7 @@ import html
 import json
 import os
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -19,9 +20,15 @@ from pathlib import Path
 from todo import (
     USER_TASKS_DIR,
     add_task,
+    check_due_reminders,
     delete_task,
+    edit_task,
+    format_reminder_display,
     load_tasks,
+    mark_reminder_sent,
+    parse_reminder_datetime,
     set_task_done,
+    set_task_reminder,
     toggle_task,
 )
 
@@ -188,19 +195,25 @@ def format_tasks_view(user_id: int | str) -> tuple[str, dict]:
     ]
     for t in tasks:
         icon = "✅" if t.get("done") else "⬜️"
-        text_lines.append(f"{icon} <b>#{t.get('id')}</b> {html.escape(t.get('text', ''))}")
+        rem_str = ""
+        if t.get("reminder"):
+            disp = format_reminder_display(t.get("reminder"))
+            rem_str = f" <i>(⏰ {disp})</i>"
+        text_lines.append(f"{icon} <b>#{t.get('id')}</b> {html.escape(t.get('text', ''))}{rem_str}")
 
     text_lines.append(f"\n📊 <i>Всего: {total} | Выполнено: {done_count} | Осталось: {pending_count}</i>")
-    text_lines.append("<i>💡 Нажмите кнопку ниже, чтобы переключить статус задачи:</i>")
+    text_lines.append("<i>💡 Кнопка ⏰ настраивает напоминание к задаче:</i>")
     text = "\n".join(text_lines)
 
     # Инлайн-кнопки для каждой персональной задачи
     inline_keyboard = []
     for t in tasks:
         status_icon = "✅" if t.get("done") else "⬜️"
-        btn_text = f"{status_icon} #{t.get('id')} {t.get('text', '')[:25]}"
+        btn_text = f"{status_icon} #{t.get('id')} {t.get('text', '')[:20]}"
+        rem_icon = "⏰" if t.get("reminder") else "⏱️"
         inline_keyboard.append([
             {"text": btn_text, "callback_data": f"toggle:{t.get('id')}"},
+            {"text": rem_icon, "callback_data": f"rem_menu:{t.get('id')}"},
             {"text": "🗑️", "callback_data": f"del:{t.get('id')}"},
         ])
 
@@ -213,6 +226,44 @@ def format_tasks_view(user_id: int | str) -> tuple[str, dict]:
 
     keyboard = {"inline_keyboard": inline_keyboard}
     return text, keyboard
+
+
+def format_reminder_menu(task_id: int, user_id: str | int) -> tuple[str, dict]:
+    """Формирует интерактивное меню быстрых настроек напоминания для задачи."""
+    tasks = load_tasks(user_id)
+    task = next((t for t in tasks if t.get("id") == task_id), None)
+    if not task:
+        return "❌ Задача не найдена в вашем списке.", {"inline_keyboard": [[{"text": "🔙 К списку", "callback_data": "refresh"}]]}
+
+    curr_rem = format_reminder_display(task.get("reminder")) if task.get("reminder") else "не установлено"
+    text = (
+        f"⏰ <b>Напоминание для задачи #{task_id}</b>\n\n"
+        f"📌 «{html.escape(task.get('text', ''))}»\n"
+        f"Текущее напоминание: <b>{curr_rem}</b>\n\n"
+        "Выберите быстрый интервал или задайте точное время сообщением:\n"
+        f"<code>/remind {task_id} 18:00</code>"
+    )
+
+    kb = [
+        [
+            {"text": "⏱ +15 минут", "callback_data": f"set_rem:{task_id}:15m"},
+            {"text": "⏱ +1 час", "callback_data": f"set_rem:{task_id}:1h"},
+        ],
+        [
+            {"text": "⏱ +3 часа", "callback_data": f"set_rem:{task_id}:3h"},
+            {"text": "📅 Сегодня 18:00", "callback_data": f"set_rem:{task_id}:today_18"},
+        ],
+        [
+            {"text": "📅 Завтра 09:00", "callback_data": f"set_rem:{task_id}:tomorrow_09"},
+            {"text": "📅 Завтра 18:00", "callback_data": f"set_rem:{task_id}:tomorrow_18"},
+        ],
+    ]
+    if task.get("reminder"):
+        kb.append([{"text": "❌ Отключить напоминание", "callback_data": f"set_rem:{task_id}:cancel"}])
+    kb.append([{"text": "🔙 Назад к списку", "callback_data": "refresh"}])
+
+    return text, {"inline_keyboard": kb}
+
 
 
 def get_main_reply_keyboard() -> dict:
@@ -286,11 +337,13 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
         help_text = (
             f"📖 <b>Справка (Ваш личный ID: <code>{user_id}</code>):</b>\n\n"
             "🔒 <b>Индивидуальность:</b> ваш список задач хранится в отдельном защищённом файле и доступен только вам.\n\n"
-            "• <b>/list</b> (или кнопка «📋 Список задач») — выводит ваш персональный список с интерактивными кнопками;\n"
-            "• <b>/add &lt;текст&gt;</b> — добавляет задачу в ваш список;\n"
+            "• <b>/list</b> (или кнопка «📋 Список задач») — выводит ваш список задач с кнопками статуса и напоминаний;\n"
+            "• <b>/add &lt;текст&gt; [-r &lt;время&gt;]</b> — добавляет задачу (напр. <code>/add Позвонить врачу -r 18:00</code>);\n"
+            "• <b>/remind &lt;номер&gt; &lt;время&gt;</b> — установить напоминание (напр. <code>/remind 1 15m</code> или <code>/remind 1 завтра 10:00</code>);\n"
             "• <b>/done &lt;номер&gt;</b> — отмечает задачу выполненной;\n"
             "• <b>/delete &lt;номер&gt;</b> — удаляет задачу;\n"
-            "• <b>Обычный текст</b> — просто напишите боту задачу (например: <i>Купить молоко</i>), и она будет добавлена."
+            "• <b>Обычный текст</b> — просто отправьте текст боту (например: <i>Купить молоко</i>), и задача будет создана.\n\n"
+            "<i>🔔 Когда наступит время напоминания, бот пришлёт уведомление с кнопками быстрого переноса (+15м, +1ч)!</i>"
         )
         bot.send_message(chat_id, help_text, reply_markup=get_main_reply_keyboard())
         return
@@ -312,19 +365,70 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
         )
         return
 
+    # Команда /remind <id> <время>
+    if text.startswith("/remind") or text.startswith("/rem"):
+        pending_add.discard(user_id)
+        parts = text.split(maxsplit=2)
+        if len(parts) < 3:
+            bot.send_message(
+                chat_id,
+                "⚠️ Укажите ID задачи и время напоминания.\n\n"
+                "Примеры:\n"
+                "• <code>/remind 1 18:00</code> (сегодня или завтра в 18:00)\n"
+                "• <code>/remind 1 15m</code> (через 15 минут)\n"
+                "• <code>/remind 1 завтра 09:30</code>\n"
+                "• <code>/remind 1 отмена</code> (выключить)",
+            )
+            return
+        try:
+            task_id = int(parts[1])
+        except ValueError:
+            bot.send_message(chat_id, "⚠️ ID задачи должен быть числом.\nПример: <code>/remind 1 18:00</code>")
+            return
+
+        rem_val = parts[2].strip()
+        updated = set_task_reminder(task_id, rem_val, user_id=user_id)
+        if updated is None:
+            bot.send_message(
+                chat_id,
+                f"❌ Не удалось распознать формат времени «{html.escape(rem_val)}» или задача #{task_id} не найдена."
+            )
+            return
+
+        if updated.get("reminder"):
+            disp = format_reminder_display(updated.get("reminder"))
+            bot.send_message(chat_id, f"⏰ Напоминание для задачи #{task_id} установлено: <b>{disp}</b>")
+        else:
+            bot.send_message(chat_id, f"Напоминание для задачи #{task_id} отключено.")
+
+        view_text, markup = format_tasks_view(user_id)
+        bot.send_message(chat_id, view_text, reply_markup=markup)
+        return
+
     # Команда /add <текст>
     if text.startswith("/add"):
         pending_add.discard(user_id)
         parts = text.split(maxsplit=1)
         if len(parts) < 2 or not parts[1].strip():
-            bot.send_message(chat_id, "⚠️ Укажите текст задачи.\nПример: <code>/add Купить продукты</code>")
+            bot.send_message(chat_id, "⚠️ Укажите текст задачи.\nПример: <code>/add Купить продукты -r 18:00</code>")
             return
-        task_text = parts[1].strip()
-        task = add_task(task_text, user_id=user_id)
+        raw_text = parts[1].strip()
+        rem_val = None
+        if " -r " in raw_text or " --remind " in raw_text:
+            sep = " -r " if " -r " in raw_text else " --remind "
+            t_parts = raw_text.split(sep, 1)
+            raw_text = t_parts[0].strip()
+            rem_val = t_parts[1].strip()
+
+        task = add_task(raw_text, user_id=user_id, reminder=rem_val)
         view_text, markup = format_tasks_view(user_id)
+        rem_info = ""
+        if task.get("reminder"):
+            disp = format_reminder_display(task.get("reminder"))
+            rem_info = f"\n⏰ <i>Напоминание: {disp}</i>"
         bot.send_message(
             chat_id,
-            f"✅ Задача добавлена в ваш список (<b>ID: {task['id']}</b>):\n«{html.escape(task['text'])}»",
+            f"✅ Задача добавлена в ваш список (<b>ID: {task['id']}</b>):\n«{html.escape(task['text'])}»{rem_info}",
             reply_markup=get_main_reply_keyboard(),
         )
         bot.send_message(chat_id, view_text, reply_markup=markup)
@@ -425,6 +529,69 @@ def handle_callback_query(bot: TelegramBot, callback: dict) -> None:
         view_text, markup = format_tasks_view(user_id)
         bot.edit_message_text(chat_id, message_id, view_text, reply_markup=markup)
 
+    elif data.startswith("rem_menu:"):
+        try:
+            task_id = int(data.split(":")[1])
+            text, markup = format_reminder_menu(task_id, user_id)
+            bot.answer_callback_query(query_id)
+            bot.edit_message_text(chat_id, message_id, text, reply_markup=markup)
+        except Exception:
+            bot.answer_callback_query(query_id, "Ошибка меню")
+
+    elif data.startswith("set_rem:"):
+        try:
+            parts = data.split(":")
+            task_id = int(parts[1])
+            preset = parts[2]
+            preset_map = {
+                "15m": "15m",
+                "1h": "1h",
+                "3h": "3h",
+                "today_18": "сегодня 18:00",
+                "tomorrow_09": "завтра 09:00",
+                "tomorrow_18": "завтра 18:00",
+                "cancel": "отмена",
+            }
+            time_val = preset_map.get(preset, preset)
+            updated = set_task_reminder(task_id, time_val, user_id=user_id)
+            if updated and updated.get("reminder"):
+                disp = format_reminder_display(updated.get("reminder"))
+                bot.answer_callback_query(query_id, f"⏰ Установлено: {disp}")
+            elif updated:
+                bot.answer_callback_query(query_id, "Напоминание выключено")
+            else:
+                bot.answer_callback_query(query_id, "Ошибка установки")
+
+            view_text, markup = format_tasks_view(user_id)
+            bot.edit_message_text(chat_id, message_id, view_text, reply_markup=markup)
+        except Exception:
+            bot.answer_callback_query(query_id, "Ошибка сохранения")
+
+    elif data.startswith("snooze:"):
+        try:
+            parts = data.split(":")
+            task_id = int(parts[1])
+            preset = parts[2]
+            preset_map = {
+                "15m": "15m",
+                "1h": "1h",
+                "tomorrow_09": "завтра 09:00",
+            }
+            time_val = preset_map.get(preset, preset)
+            updated = set_task_reminder(task_id, time_val, user_id=user_id)
+            if updated and updated.get("reminder"):
+                disp = format_reminder_display(updated.get("reminder"))
+                bot.answer_callback_query(query_id, f"Перенесено: {disp}")
+                bot.edit_message_text(
+                    chat_id,
+                    message_id,
+                    f"⏰ Напоминание по задаче #{task_id} отложено на <b>{disp}</b>!"
+                )
+            else:
+                bot.answer_callback_query(query_id, "Ошибка переноса")
+        except Exception:
+            bot.answer_callback_query(query_id, "Ошибка")
+
     elif data == "refresh":
         bot.answer_callback_query(query_id, "Список обновлен 🔄")
         view_text, markup = format_tasks_view(user_id)
@@ -437,6 +604,64 @@ def handle_callback_query(bot: TelegramBot, callback: dict) -> None:
             "✍️ Просто напишите текст задачи сообщением в чат:",
             reply_markup=get_main_reply_keyboard(),
         )
+
+
+def check_and_send_reminders(bot: TelegramBot) -> None:
+    """Проверяет базы задач и отправляет уведомления о наступивших напоминаниях."""
+    # 1. Персональные базы в user_tasks/
+    if USER_TASKS_DIR.exists():
+        for f in USER_TASKS_DIR.glob("*.json"):
+            user_id = f.stem
+            try:
+                due = check_due_reminders(user_id)
+                for t in due:
+                    mark_reminder_sent(t.get("id"), user_id)
+                    disp = format_reminder_display(t.get("reminder"))
+                    text = (
+                        f"⏰ <b>Напоминание о задаче!</b>\n\n"
+                        f"📌 <b>#{t.get('id')}</b>: {html.escape(t.get('text', ''))}\n"
+                        f"<i>Установленное время: {disp}</i>"
+                    )
+                    kb = {
+                        "inline_keyboard": [
+                            [{"text": "✅ Выполнить", "callback_data": f"toggle:{t.get('id')}"}],
+                            [
+                                {"text": "⏱ +15м", "callback_data": f"snooze:{t.get('id')}:15m"},
+                                {"text": "⏱ +1ч", "callback_data": f"snooze:{t.get('id')}:1h"},
+                                {"text": "📅 Завтра", "callback_data": f"snooze:{t.get('id')}:tomorrow_09"},
+                            ]
+                        ]
+                    }
+                    bot.send_message(user_id, text, reply_markup=kb)
+            except Exception:
+                pass
+
+    # 2. Общий tasks.json для DEFAULT_USER_ID
+    def_uid = os.environ.get("DEFAULT_USER_ID")
+    if def_uid:
+        try:
+            due = check_due_reminders("local")
+            for t in due:
+                mark_reminder_sent(t.get("id"), "local")
+                disp = format_reminder_display(t.get("reminder"))
+                text = (
+                    f"⏰ <b>Напоминание о задаче (tasks.json)!</b>\n\n"
+                    f"📌 <b>#{t.get('id')}</b>: {html.escape(t.get('text', ''))}\n"
+                    f"<i>Время: {disp}</i>"
+                )
+                bot.send_message(def_uid, text)
+        except Exception:
+            pass
+
+
+def reminder_worker(bot: TelegramBot) -> None:
+    """Фоновый поток для проверки напоминаний каждые 20 секунд."""
+    while True:
+        try:
+            check_and_send_reminders(bot)
+        except Exception:
+            pass
+        time.sleep(20)
 
 
 def run_bot() -> None:
@@ -472,8 +697,13 @@ def run_bot() -> None:
     print(f" 🚀 Бот успешно запущен: @{bot_username} ({bot_first_name})")
     print(" 🔒 Режим: Индивидуальные списки задач по каждому Telegram ID")
     print(f" 📁 Папка персональных баз: {USER_TASKS_DIR.resolve()}")
+    print(" ⏰ Служба напоминаний: АКТИВНА (проверка каждые 20 сек)")
     print(" Бот ожидает входящие сообщения. Для остановки нажмите Ctrl+C.")
     print("=" * 60 + "\n")
+
+    # Запускаем фоновый планировщик напоминаний
+    rem_thread = threading.Thread(target=reminder_worker, args=(bot,), daemon=True, name="ReminderWorker")
+    rem_thread.start()
 
     offset = 0
     pending_add = set()

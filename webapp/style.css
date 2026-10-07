@@ -617,3 +617,51 @@ body {
 .hidden {
   display: none !important;
 }
+
+/* Бейджи и кнопки напоминаний */
+.task-reminder-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--btn-color);
+  background: color-mix(in srgb, var(--btn-color) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--btn-color) 25%, transparent);
+  padding: 2px 7px;
+  border-radius: 6px;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.task-reminder-badge.past {
+  color: #e53935;
+  background: color-mix(in srgb, #e53935 12%, transparent);
+  border-color: color-mix(in srgb, #e53935 25%, transparent);
+}
+
+.remind-btn {
+  background: transparent;
+  border: none;
+  color: var(--hint-color);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.remind-btn:hover,
+.remind-btn:active {
+  color: var(--btn-color);
+  background: color-mix(in srgb, var(--btn-color) 12%, transparent);
+}
+
+.remind-btn.active {
+  color: var(--btn-color);
+}
