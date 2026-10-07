@@ -86,20 +86,26 @@ function initUser() {
 
   if (tg) {
     tg.ready();
-    tg.expand();
 
-    // Запрос полноэкранного режима для Bot API 8.0+
-    if (typeof tg.requestFullscreen === "function") {
-      try {
-        tg.requestFullscreen();
-      } catch (e) {}
-    }
+    const p = (tg.platform || "").toLowerCase();
+    const isDesktop = ["tdesktop", "macos", "web", "weba", "webk"].includes(p) || window.innerWidth >= 768;
 
-    // Отключение вертикального смахивания (чтобы окно не сворачивалось при скролле)
-    if (typeof tg.disableVerticalSwipes === "function") {
-      try {
-        tg.disableVerticalSwipes();
-      } catch (e) {}
+    if (!isDesktop) {
+      tg.expand();
+
+      // Запрос полноэкранного режима только для смартфонов (Bot API 8.0+)
+      if (typeof tg.requestFullscreen === "function") {
+        try {
+          tg.requestFullscreen();
+        } catch (e) {}
+      }
+
+      // Отключение вертикального смахивания (чтобы окно не сворачивалось при скролле)
+      if (typeof tg.disableVerticalSwipes === "function") {
+        try {
+          tg.disableVerticalSwipes();
+        } catch (e) {}
+      }
     }
 
     try {

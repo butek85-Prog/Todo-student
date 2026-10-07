@@ -50,7 +50,7 @@ except Exception:
         inline_keyboard = []
         for t in tasks:
             status_icon = "✅" if t.get("done") else "⬜️"
-            btn_text = f"{status_icon} #{t.get('id')} {t.get('text', '')[:20]}"
+            btn_text = f"{status_icon} #{t.get('id')} {t.get('text', '')[:36]}"
             rem_icon = "⏰" if t.get("reminder") else "⏱️"
             inline_keyboard.append([
                 {"text": btn_text, "callback_data": f"toggle:{t.get('id')}"},

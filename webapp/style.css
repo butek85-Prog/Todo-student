@@ -543,11 +543,12 @@ body {
 
 /* Текст задачи */
 .task-body {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
 }
 
 .task-id-badge {
@@ -561,6 +562,8 @@ body {
 }
 
 .task-text {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 15px;
   word-break: break-word;
   color: var(--text-color);
@@ -656,16 +659,17 @@ body {
 .task-reminder-badge {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  font-size: 11px;
+  gap: 2px;
+  font-size: 10.5px;
   font-weight: 600;
   color: var(--btn-color);
   background: color-mix(in srgb, var(--btn-color) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--btn-color) 25%, transparent);
-  padding: 2px 7px;
-  border-radius: 6px;
-  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  margin-left: 4px;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .task-reminder-badge.past {
@@ -678,14 +682,17 @@ body {
   background: transparent;
   border: none;
   color: var(--hint-color);
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 24px;
+  min-width: 24px;
+  max-width: 24px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 15px;
   transition: var(--transition);
   flex-shrink: 0;
 }
@@ -699,3 +706,28 @@ body {
 .remind-btn.active {
   color: var(--btn-color);
 }
+
+/* Адаптация для экранов компьютеров и ноутбуков (не на весь экран) */
+@media (min-width: 769px) {
+  body {
+    background-color: var(--secondary-bg);
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 30px 16px;
+  }
+
+  .app-container {
+    max-width: 480px;
+    width: 100%;
+    margin: 0 auto;
+    background-color: var(--bg-color);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    min-height: auto;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}
+

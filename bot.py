@@ -222,7 +222,7 @@ def format_tasks_view(user_id: int | str) -> tuple[str, dict]:
     inline_keyboard = []
     for t in tasks:
         status_icon = "✅" if t.get("done") else "⬜️"
-        btn_text = f"{status_icon} #{t.get('id')} {t.get('text', '')[:20]}"
+        btn_text = f"{status_icon} #{t.get('id')} {t.get('text', '')[:36]}"
         rem_icon = "⏰" if t.get("reminder") else "⏱️"
         inline_keyboard.append([
             {"text": btn_text, "callback_data": f"toggle:{t.get('id')}"},
@@ -230,11 +230,7 @@ def format_tasks_view(user_id: int | str) -> tuple[str, dict]:
             {"text": "🗑️", "callback_data": f"del:{t.get('id')}"},
         ])
 
-    webapp_url = os.environ.get("WEBAPP_URL", "").strip()
     bottom_row = [{"text": "🔄 Обновить список", "callback_data": "refresh"}]
-    if webapp_url.startswith("https://"):
-        bottom_row.append({"text": "🌐 Веб-приложение", "web_app": {"url": webapp_url}})
-
     inline_keyboard.append(bottom_row)
 
     keyboard = {"inline_keyboard": inline_keyboard}

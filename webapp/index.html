@@ -7,16 +7,20 @@
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>
-    // Мгновенное разворачивание на весь экран
+    // Разворачивание на весь экран только на мобильных устройствах, НЕ на компьютере
     try {
       if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.ready();
-        window.Telegram.WebApp.expand();
-        if (typeof window.Telegram.WebApp.requestFullscreen === "function") {
-          window.Telegram.WebApp.requestFullscreen();
-        }
-        if (typeof window.Telegram.WebApp.disableVerticalSwipes === "function") {
-          window.Telegram.WebApp.disableVerticalSwipes();
+        const p = (window.Telegram.WebApp.platform || "").toLowerCase();
+        const isDesktop = ["tdesktop", "macos", "web", "weba", "webk"].includes(p) || window.innerWidth >= 768;
+        if (!isDesktop) {
+          window.Telegram.WebApp.expand();
+          if (typeof window.Telegram.WebApp.requestFullscreen === "function") {
+            window.Telegram.WebApp.requestFullscreen();
+          }
+          if (typeof window.Telegram.WebApp.disableVerticalSwipes === "function") {
+            window.Telegram.WebApp.disableVerticalSwipes();
+          }
         }
       }
     } catch (e) {}

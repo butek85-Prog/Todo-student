@@ -10,9 +10,13 @@
     try {
       if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.ready();
-        window.Telegram.WebApp.expand();
-        if (typeof window.Telegram.WebApp.requestFullscreen === 'function') {
-          window.Telegram.WebApp.requestFullscreen();
+        const p = (window.Telegram.WebApp.platform || "").toLowerCase();
+        const isDesktop = ["tdesktop", "macos", "web", "weba", "webk"].includes(p) || window.innerWidth >= 768;
+        if (!isDesktop) {
+          window.Telegram.WebApp.expand();
+          if (typeof window.Telegram.WebApp.requestFullscreen === 'function') {
+            window.Telegram.WebApp.requestFullscreen();
+          }
         }
       }
     } catch (e) {}
@@ -443,6 +447,14 @@
     }
     .tg-inline-btn.btn-del:hover {
       background-color: var(--danger-light);
+    }
+    .tg-inline-btn.btn-rem {
+      flex: 0 0 44px;
+      padding: 8px 4px;
+      color: var(--warning);
+    }
+    .tg-inline-btn.btn-rem:hover {
+      background-color: rgba(245, 158, 11, 0.15);
     }
 
     /* Постоянная нижняя клавиатура (Reply Keyboard) */
@@ -1786,8 +1798,12 @@
           rowDiv.className = "tg-inline-row";
 
           row.forEach((btn) => {
+            // Убираем кнопку "Веб-приложение"
+            if (btn.text && btn.text.includes("Веб-приложение")) return;
             const btnEl = document.createElement("button");
-            btnEl.className = `tg-inline-btn ${btn.callback_data && btn.callback_data.startsWith("del:") ? "btn-del" : ""}`;
+            const isDel = btn.callback_data && btn.callback_data.startsWith("del:");
+            const isRem = btn.callback_data && btn.callback_data.startsWith("rem_menu:");
+            btnEl.className = `tg-inline-btn ${isDel ? "btn-del" : ""} ${isRem ? "btn-rem" : ""}`.trim();
             btnEl.textContent = btn.text;
             btnEl.dataset.callback = btn.callback_data || "";
 
@@ -1844,8 +1860,12 @@
                   const rowDiv = document.createElement("div");
                   rowDiv.className = "tg-inline-row";
                   row.forEach((btn) => {
+                    // Убираем кнопку "Веб-приложение"
+                    if (btn.text && btn.text.includes("Веб-приложение")) return;
                     const btnEl = document.createElement("button");
-                    btnEl.className = `tg-inline-btn ${btn.callback_data && btn.callback_data.startsWith("del:") ? "btn-del" : ""}`;
+                    const isDel = btn.callback_data && btn.callback_data.startsWith("del:");
+                    const isRem = btn.callback_data && btn.callback_data.startsWith("rem_menu:");
+                    btnEl.className = `tg-inline-btn ${isDel ? "btn-del" : ""} ${isRem ? "btn-rem" : ""}`.trim();
                     btnEl.textContent = btn.text;
                     btnEl.dataset.callback = btn.callback_data || "";
                     btnEl.addEventListener("click", () => handleInlineButtonClick(btn.callback_data, messageElement));
