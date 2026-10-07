@@ -40,11 +40,13 @@ async def lifespan(app: FastAPI):
     token = bot.get_bot_token()
 
     if start_bot_flag and token:
-        print("🤖 [Server Lifespan] Запуск Telegram-бота в фоновом режиме...", flush=True)
+        masked = token[:6] + "..." + token[-4:] if len(token) > 10 else "***"
+        print(f"🤖 [Server Lifespan] Токен обнаружен ({masked}). Запуск Telegram-бота в фоновом режиме...", flush=True)
         bot_thread = threading.Thread(target=bot.run_bot, daemon=True, name="TelegramBotThread")
         bot_thread.start()
     elif not token:
-        print("⚠️ [Server Lifespan] BOT_TOKEN не задан. Бот не запущен, работает только веб-сервер.", flush=True)
+        print("⚠️ [Server Lifespan] ВНИМАНИЕ: Переменная BOT_TOKEN не найдена в окружении сервера!", flush=True)
+        print("⚠️ Добавьте BOT_TOKEN в настройках сервиса на Render (вкладка Environment) для работы бота.", flush=True)
 
     yield
 

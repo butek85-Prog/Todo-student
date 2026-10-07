@@ -66,30 +66,32 @@ def load_env_file() -> None:
 
 
 def get_bot_token() -> str:
-    """Получает токен Telegram бота из окружения, файла .env, аргументов или файла bot_token.txt."""
+    """Получает токен Telegram бота из окружения, файла .env, файла bot_token.txt или аргументов bot.py."""
     # Загружаем переменные из .env
     load_env_file()
 
-    # 1. Из аргументов командной строки: python bot.py <TOKEN> или --token <TOKEN>
-    if len(sys.argv) > 1:
-        if sys.argv[1] in ("--token", "-t") and len(sys.argv) > 2:
-            return sys.argv[2].strip()
-        elif not sys.argv[1].startswith("-"):
-            return sys.argv[1].strip()
-
-    # 2. Из переменной окружения (.env или системного окружения)
+    # 1. Из переменной окружения (.env или системного окружения сервера) — приоритет #1
     env_token = os.environ.get("BOT_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN")
-    if env_token:
+    if env_token and env_token.strip():
         return env_token.strip()
 
-    # 3. Из файла bot_token.txt
+    # 2. Из файла bot_token.txt
     if TOKEN_FILE.exists():
         try:
             content = TOKEN_FILE.read_text(encoding="utf-8").strip()
-            if content:
+            if content and ":" in content:
                 return content
         except Exception:
             pass
+
+    # 3. Из аргументов командной строки ТОЛЬКО если запускается именно bot.py напрямую
+    script_name = Path(sys.argv[0]).name.lower() if sys.argv else ""
+    if "bot" in script_name and len(sys.argv) > 1:
+        if sys.argv[1] in ("--token", "-t") and len(sys.argv) > 2:
+            return sys.argv[2].strip()
+        elif not sys.argv[1].startswith("-") and ":" in sys.argv[1]:
+            # Токен Telegram всегда содержит двоеточие (например: 8834421535:AAH...)
+            return sys.argv[1].strip()
 
     return ""
 
@@ -165,6 +167,17 @@ class TelegramBot:
         if text:
             payload["text"] = text
         self.api_request("answerCallbackQuery", payload)
+
+    def delete_webhook(self, drop_pending_updates: bool = False) -> bool:
+        """Удаляет вебхук для возможности использования Long Polling."""
+        res = self.api_request("deleteWebhook", {"drop_pending_updates": drop_pending_updates})
+        return bool(res)
+
+    def set_webhook(self, url: str) -> bool:
+        """Устанавливает адрес вебхука для получения обновлений."""
+        res = self.api_request("setWebhook", {"url": url})
+        return bool(res)
+
 
 
 def format_tasks_view(user_id: int | str) -> tuple[str, dict]:
@@ -682,13 +695,25 @@ def run_bot() -> None:
         sys.exit(1)
 
     bot = TelegramBot(token)
-    print("Подключение к Telegram Bot API...")
-    bot_info = bot.get_me()
+    print("Подключение к Telegram Bot API...", flush=True)
+
+    # Очищаем вебхук на случай, если он был установлен ранее, чтобы разрешить getUpdates
+    try:
+        bot.delete_webhook()
+    except Exception:
+        pass
+
+    bot_info = None
+    for attempt in range(1, 6):
+        bot_info = bot.get_me()
+        if bot_info:
+            break
+        print(f"Попытка {attempt}/5: ожидание связи с Telegram Bot API...", flush=True)
+        time.sleep(2)
 
     if not bot_info:
-        print("\n❌ Ошибка: Не удалось авторизоваться в Telegram Bot API.")
-        print("Проверьте правильность токена и подключение к интернету.")
-        sys.exit(1)
+        print("\n❌ Ошибка: Не удалось авторизоваться в Telegram Bot API. Проверьте правильность BOT_TOKEN.", flush=True)
+        return
 
     bot_username = bot_info.get("username", "UnknownBot")
     bot_first_name = bot_info.get("first_name", "TodoBot")
