@@ -71,6 +71,8 @@ def get_tasks_file(user_id: str | int | None = None) -> Path:
         return TASKS_FILE
     USER_TASKS_DIR.mkdir(parents=True, exist_ok=True)
     safe_id = "".join(c for c in str(user_id) if c.isalnum() or c in ("-", "_"))
+    if not safe_id:
+        return TASKS_FILE
     return USER_TASKS_DIR / f"{safe_id}.json"
 
 

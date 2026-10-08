@@ -141,19 +141,35 @@ function initUser() {
     return;
   }
 
-  // 2. Если открыто в обычном браузере (тестирование)
+  // 2. Если передан параметр user_id в URL (например, из ссылки бота)
+  if (paramUserId && paramUserId.trim()) {
+    state.userId = paramUserId.trim();
+    localStorage.setItem("todo_test_user_id", state.userId);
+    elements.userName.textContent = `Мои задачи (${state.userId})`;
+    elements.userSubtitle.textContent = "Личный список • Синхронизация активна";
+    elements.bannerUserId.textContent = state.userId;
+    if (tg && (tg.platform === "web" || tg.platform === "weba" || tg.platform === "webk")) {
+      elements.banner.classList.add("hidden");
+    } else {
+      elements.banner.classList.remove("hidden");
+    }
+    return;
+  }
+
+  // 3. Если открыто в обычном браузере (тестирование)
   elements.banner.classList.remove("hidden");
 
-  if (paramUserId) {
-    state.userId = paramUserId;
-  } else {
-    const savedId = localStorage.getItem("todo_test_user_id");
-    state.userId = savedId || "5265404800"; // Используем существующего пользователя по умолчанию
+  let savedId = localStorage.getItem("todo_test_user_id");
+  if (!savedId || savedId === "5265404800") {
+    // Генерируем уникальный случайный ID для данного браузера/пользователя
+    savedId = "web_" + Math.random().toString(36).substring(2, 9);
+    localStorage.setItem("todo_test_user_id", savedId);
   }
+  state.userId = savedId;
 
   elements.bannerUserId.textContent = state.userId;
   elements.userName.textContent = `Мои задачи (${state.userId})`;
-  elements.userSubtitle.textContent = "Режим браузера • Синхронизация активна";
+  elements.userSubtitle.textContent = "Режим браузера • Личный список";
 }
 
 /**

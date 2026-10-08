@@ -223,16 +223,17 @@ class TodoWebHandler(http.server.BaseHTTPRequestHandler):
         # API: Список пользователей
         if path == "/api/users":
             users = get_all_users()
-            def_uid = os.environ.get("DEFAULT_USER_ID", "5265404800")
+            def_uid = os.environ.get("DEFAULT_USER_ID", "").strip()
             self.send_json({"ok": True, "users": users, "default_user_id": def_uid})
             return
 
         # API: Список задач конкретного пользователя
         if path == "/api/tasks":
             user_id = query.get("user_id", [None])[0]
-            if not user_id or user_id in ("", "null"):
-                user_id = os.environ.get("DEFAULT_USER_ID", "5265404800")
-            elif user_id == "default":
+            if not user_id or str(user_id).lower() in ("", "null", "undefined"):
+                env_def = os.environ.get("DEFAULT_USER_ID", "").strip()
+                user_id = env_def if env_def else None
+            elif str(user_id).lower() in ("default", "local"):
                 user_id = None
 
             tasks = todo.load_tasks(user_id)

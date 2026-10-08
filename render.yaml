@@ -8,8 +8,6 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
-      - key: DEFAULT_USER_ID
-        value: "5265404800"
       - key: BOT_TOKEN
         sync: false
       - key: WEBAPP_URL

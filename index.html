@@ -1316,7 +1316,7 @@
       <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">
         Будет создан или открыт персональный список задач в <code>user_tasks/&lt;id&gt;.json</code>.
       </p>
-      <input type="text" class="modal-input" id="newUserIdInput" placeholder="Например: 5265404800 или test_user" />
+      <input type="text" class="modal-input" id="newUserIdInput" placeholder="Например: 123456789 или my_tasks" />
       <div class="modal-actions">
         <button class="btn-secondary" id="modalCancelBtn">Отмена</button>
         <button class="btn-primary" id="modalConfirmBtn">Открыть задачи</button>
@@ -1328,9 +1328,26 @@
     // ==============================================================
     // СОСТОЯНИЕ ПРИЛОЖЕНИЯ
     // ==============================================================
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryUserId = urlParams.get("user_id");
+
+    function getInitialUserId() {
+      if (queryUserId && queryUserId.trim()) {
+        const clean = queryUserId.trim();
+        localStorage.setItem("todo_user_id", clean);
+        return clean;
+      }
+      let stored = localStorage.getItem("todo_user_id");
+      if (!stored || stored === "5265404800") {
+        stored = "web_" + Math.random().toString(36).substring(2, 9);
+        localStorage.setItem("todo_user_id", stored);
+      }
+      return stored;
+    }
+
     const state = {
       isServerOnline: false,
-      userId: localStorage.getItem("todo_user_id") || "5265404800",
+      userId: getInitialUserId(),
       tasks: [],
       stats: { total: 0, done: 0, pending: 0, percent: 0 },
       currentFilter: "all",

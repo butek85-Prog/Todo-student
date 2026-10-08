@@ -275,14 +275,18 @@ def format_reminder_menu(task_id: int, user_id: str | int) -> tuple[str, dict]:
 
 
 
-def get_main_reply_keyboard() -> dict:
+def get_main_reply_keyboard(user_id: int | str | None = None) -> dict:
     """Главная клавиатура внизу экрана."""
     webapp_url = os.environ.get("WEBAPP_URL", "").strip()
     keyboard = [
         [{"text": "📋 Список задач"}, {"text": "➕ Добавить задачу"}],
     ]
     if webapp_url.startswith("https://"):
-        keyboard.append([{"text": "🌐 Открыть веб-приложение", "web_app": {"url": webapp_url}}])
+        target_url = webapp_url
+        if user_id:
+            sep = "&" if "?" in webapp_url else "?"
+            target_url = f"{webapp_url}{sep}user_id={user_id}"
+        keyboard.append([{"text": "🌐 Открыть веб-приложение", "web_app": {"url": target_url}}])
     keyboard.append([{"text": "ℹ️ Помощь"}])
 
     return {
@@ -314,7 +318,7 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
         bot.send_message(
             chat_id,
             f"✅ Задача добавлена в ваш личный список (<b>ID: {task['id']}</b>):\n«{html.escape(task['text'])}»",
-            reply_markup=get_main_reply_keyboard(),
+            reply_markup=get_main_reply_keyboard(user_id),
         )
         bot.send_message(chat_id, view_text, reply_markup=markup)
         return
@@ -335,7 +339,7 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
             "• ℹ️ <code>/help</code> — показать справку\n\n"
             "<i>💡 Вы можете просто отправить любой текст в чат, и я добавлю его в ваш личный список!</i>"
         )
-        bot.send_message(chat_id, welcome, reply_markup=get_main_reply_keyboard())
+        bot.send_message(chat_id, welcome, reply_markup=get_main_reply_keyboard(user_id))
         view_text, markup = format_tasks_view(user_id)
         bot.send_message(chat_id, view_text, reply_markup=markup)
         return
@@ -354,7 +358,7 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
             "• <b>Обычный текст</b> — просто отправьте текст боту (например: <i>Купить молоко</i>), и задача будет создана.\n\n"
             "<i>🔔 Когда наступит время напоминания, бот пришлёт уведомление с кнопками быстрого переноса (+15м, +1ч)!</i>"
         )
-        bot.send_message(chat_id, help_text, reply_markup=get_main_reply_keyboard())
+        bot.send_message(chat_id, help_text, reply_markup=get_main_reply_keyboard(user_id))
         return
 
     # Команда /list или кнопка "📋 Список задач"
@@ -370,7 +374,7 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
         bot.send_message(
             chat_id,
             "✍️ <b>Напишите текст задачи в следующем сообщении:</b>",
-            reply_markup=get_main_reply_keyboard(),
+            reply_markup=get_main_reply_keyboard(user_id),
         )
         return
 
@@ -438,7 +442,7 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
         bot.send_message(
             chat_id,
             f"✅ Задача добавлена в ваш список (<b>ID: {task['id']}</b>):\n«{html.escape(task['text'])}»{rem_info}",
-            reply_markup=get_main_reply_keyboard(),
+            reply_markup=get_main_reply_keyboard(user_id),
         )
         bot.send_message(chat_id, view_text, reply_markup=markup)
         return
@@ -493,7 +497,7 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
         bot.send_message(
             chat_id,
             f"✅ Создана задача в вашем списке (<b>ID: {task['id']}</b>):\n«{html.escape(task['text'])}»",
-            reply_markup=get_main_reply_keyboard(),
+            reply_markup=get_main_reply_keyboard(user_id),
         )
         bot.send_message(chat_id, view_text, reply_markup=markup)
 
@@ -611,7 +615,7 @@ def handle_callback_query(bot: TelegramBot, callback: dict) -> None:
         bot.send_message(
             chat_id,
             "✍️ Просто напишите текст задачи сообщением в чат:",
-            reply_markup=get_main_reply_keyboard(),
+            reply_markup=get_main_reply_keyboard(user_id),
         )
 
 

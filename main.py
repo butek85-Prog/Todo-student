@@ -73,13 +73,11 @@ app.add_middleware(
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
 def get_effective_user_id(user_id: Any = None) -> Optional[str]:
-    """Возвращает user_id с учётом значения по умолчанию из .env."""
+    """Возвращает нормализованный user_id или None для локального/общего списка (tasks.json)."""
     if user_id is None or not isinstance(user_id, (str, int)):
-        return os.environ.get("DEFAULT_USER_ID", "5265404800")
+        return None
     s = str(user_id).strip()
-    if s in ("", "default", "null", "undefined"):
-        return os.environ.get("DEFAULT_USER_ID", "5265404800")
-    if s.lower() == "local":
+    if s.lower() in ("", "default", "null", "undefined", "none", "local"):
         return None
     return s
 
@@ -130,7 +128,7 @@ def api_health():
 @app.get("/api/users")
 def api_users():
     """Список баз данных пользователей."""
-    def_uid = os.environ.get("DEFAULT_USER_ID", "5265404800")
+    def_uid = os.environ.get("DEFAULT_USER_ID", "").strip()
     return {
         "ok": True,
         "users": get_all_users(),
