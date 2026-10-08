@@ -1329,11 +1329,13 @@
     function getInitialUserId() {
       if (queryUserId && queryUserId.trim()) {
         const clean = queryUserId.trim();
-        localStorage.setItem("todo_user_id", clean);
-        return clean;
+        if (!clean.startsWith("web_") && clean !== "default" && clean !== "local") {
+          localStorage.setItem("todo_user_id", clean);
+          return clean;
+        }
       }
       let stored = localStorage.getItem("todo_user_id");
-      if (!stored || stored === "default" || stored === "null" || stored === "undefined") {
+      if (!stored || stored === "default" || stored === "null" || stored === "undefined" || stored === "local" || stored.startsWith("web_")) {
         stored = "5265404800";
         localStorage.setItem("todo_user_id", stored);
       }

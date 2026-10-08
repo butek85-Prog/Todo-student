@@ -70,18 +70,30 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def add_no_cache_headers(request: Request, call_next):
+    """Предотвращает агрессивное кэширование в Telegram WebApp и браузерах."""
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith("/webapp") or path.startswith("/api") or path in ("/", "/app", "/mini-app"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
 def get_effective_user_id(user_id: Any = None) -> Optional[str]:
     """Возвращает нормализованный user_id или DEFAULT_USER_ID или None для локального/общего списка (tasks.json)."""
     if user_id is not None and isinstance(user_id, (str, int)):
         s = str(user_id).strip()
-        if s and s.lower() not in ("default", "null", "undefined", "none", "local"):
+        if s and s.lower() not in ("default", "null", "undefined", "none", "local") and not s.lower().startswith("web_"):
             return s
 
-    # Если явный user_id не передан, используем системный DEFAULT_USER_ID (привязка к боту)
+    # Если явный user_id не передан или равен web_/default/local, используем системный DEFAULT_USER_ID (привязка к боту)
     default_env = os.environ.get("DEFAULT_USER_ID", "").strip()
-    if default_env and default_env.lower() not in ("default", "null", "undefined", "none", "local"):
+    if default_env and default_env.lower() not in ("default", "null", "undefined", "none", "local") and not default_env.lower().startswith("web_"):
         return default_env
 
     return None

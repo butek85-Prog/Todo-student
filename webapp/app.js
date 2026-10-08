@@ -95,8 +95,13 @@ function extractTelegramUser() {
       const q = new URLSearchParams(tg.initData);
       const userStr = q.get("user");
       if (userStr) {
-        const u = JSON.parse(userStr);
-        if (u && u.id) return u;
+        try {
+          const u = JSON.parse(userStr);
+          if (u && u.id) return u;
+        } catch (e) {
+          const u = JSON.parse(decodeURIComponent(userStr));
+          if (u && u.id) return u;
+        }
       }
     } catch (e) {
       console.warn("Ошибка парсинга tg.initData:", e);
@@ -115,14 +120,24 @@ function extractTelegramUser() {
         const innerParams = new URLSearchParams(tgWebAppData);
         const userStr = innerParams.get("user");
         if (userStr) {
-          const u = JSON.parse(userStr);
-          if (u && u.id) return u;
+          try {
+            const u = JSON.parse(userStr);
+            if (u && u.id) return u;
+          } catch (e) {
+            const u = JSON.parse(decodeURIComponent(userStr));
+            if (u && u.id) return u;
+          }
         }
       }
       const directUser = hashParams.get("user");
       if (directUser) {
-        const u = JSON.parse(directUser);
-        if (u && u.id) return u;
+        try {
+          const u = JSON.parse(directUser);
+          if (u && u.id) return u;
+        } catch (e) {
+          const u = JSON.parse(decodeURIComponent(directUser));
+          if (u && u.id) return u;
+        }
       }
     } catch (e) {
       console.warn("Ошибка парсинга хэша Telegram:", e);
@@ -199,7 +214,7 @@ function initUser() {
   }
 
   // 2. Если передан параметр user_id в URL (например, из ссылки или инлайн-кнопки бота)
-  if (paramUserId && paramUserId.trim()) {
+  if (paramUserId && paramUserId.trim() && !paramUserId.trim().startsWith("web_") && paramUserId.trim() !== "default" && paramUserId.trim() !== "local") {
     state.userId = paramUserId.trim();
     localStorage.setItem("todo_user_id", state.userId);
     localStorage.setItem("todo_test_user_id", state.userId);
@@ -218,8 +233,8 @@ function initUser() {
   elements.banner.classList.remove("hidden");
 
   let savedId = localStorage.getItem("todo_user_id") || localStorage.getItem("todo_test_user_id");
-  if (!savedId || savedId === "default" || savedId === "null" || savedId === "undefined") {
-    // По умолчанию связываем с основным профилем Telegram (5265404800)
+  // Очищаем любые фиктивные/старые ID (web_xxx, default, local)
+  if (!savedId || savedId === "default" || savedId === "null" || savedId === "undefined" || savedId === "local" || savedId.startsWith("web_")) {
     savedId = "5265404800";
   }
   state.userId = savedId;
@@ -235,6 +250,13 @@ function initUser() {
  * Загрузка списка задач с бэкенда с предотвращением кэширования и проверкой изменений
  */
 async function fetchTasks(showSpinner = true) {
+  // Защита от фиктивных ID
+  if (!state.userId || state.userId.startsWith("web_") || state.userId === "default" || state.userId === "local") {
+    state.userId = "5265404800";
+    localStorage.setItem("todo_user_id", state.userId);
+    localStorage.setItem("todo_test_user_id", state.userId);
+  }
+
   if (showSpinner) {
     state.isLoading = true;
     elements.loadingIndicator.classList.remove("hidden");
