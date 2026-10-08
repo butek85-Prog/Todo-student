@@ -11,4 +11,4 @@ services:
       - key: BOT_TOKEN
         sync: false
       - key: WEBAPP_URL
-        sync: false
+        value: "https://todo-student-i9xh.onrender.com/webapp"

@@ -417,6 +417,7 @@ if WEBAPP_DIR.exists() and WEBAPP_DIR.is_dir():
     app.mount("/webapp", StaticFiles(directory=str(WEBAPP_DIR), html=True), name="webapp")
 
 
+@app.get("/app", response_class=HTMLResponse)
 @app.get("/mini-app", response_class=HTMLResponse)
 def get_mini_app():
     """Быстрый доступ к Telegram Mini App."""

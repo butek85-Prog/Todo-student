@@ -220,6 +220,50 @@ class TodoWebHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(content)
             return
 
+        # Telegram Mini App (/webapp, /app)
+        if path in ("/webapp", "/webapp/", "/app", "/mini-app"):
+            webapp_index = BASE_DIR / "webapp" / "index.html"
+            if webapp_index.exists():
+                with open(webapp_index, "rb") as f:
+                    content = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(content)))
+                self.send_header("Cache-Control", "no-cache")
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(content)
+                return
+
+        # Статические файлы Mini App (/webapp/app.js, /webapp/style.css)
+        if path.startswith("/webapp/"):
+            rel_path = path[len("/webapp/"):]
+            file_path = (BASE_DIR / "webapp" / rel_path).resolve()
+            if file_path.is_file() and str(file_path).startswith(str((BASE_DIR / "webapp").resolve())):
+                ext = file_path.suffix.lower()
+                ctype = "text/plain"
+                if ext == ".html":
+                    ctype = "text/html; charset=utf-8"
+                elif ext == ".css":
+                    ctype = "text/css; charset=utf-8"
+                elif ext == ".js":
+                    ctype = "application/javascript; charset=utf-8"
+                elif ext in (".png", ".jpg", ".jpeg"):
+                    ctype = f"image/{ext[1:]}"
+                elif ext == ".svg":
+                    ctype = "image/svg+xml"
+
+                with open(file_path, "rb") as f:
+                    content = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(content)))
+                self.send_header("Cache-Control", "no-cache")
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(content)
+                return
+
         # API: Список пользователей
         if path == "/api/users":
             users = get_all_users()

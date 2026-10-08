@@ -178,6 +178,35 @@ class TelegramBot:
         res = self.api_request("setWebhook", {"url": url})
         return bool(res)
 
+    def set_chat_menu_button(self, chat_id: int | str | None = None, webapp_url: str | None = None) -> bool:
+        """Устанавливает кнопку меню чата (Menu Button) для открытия WebApp."""
+        if webapp_url:
+            menu_btn = {
+                "type": "web_app",
+                "text": "📱 Задачи",
+                "web_app": {"url": webapp_url},
+            }
+        else:
+            menu_btn = {"type": "default"}
+
+        payload = {"menu_button": menu_btn}
+        if chat_id is not None:
+            payload["chat_id"] = chat_id
+        res = self.api_request("setChatMenuButton", payload)
+        return bool(res)
+
+    def set_my_commands(self) -> bool:
+        """Регистрирует список команд бота в Telegram."""
+        commands = [
+            {"command": "start", "description": "🚀 Запустить бота и открыть планировщик"},
+            {"command": "app", "description": "🌐 Открыть веб-приложение (Mini App)"},
+            {"command": "list", "description": "📋 Мой список задач"},
+            {"command": "add", "description": "➕ Добавить новую задачу"},
+            {"command": "help", "description": "ℹ️ Помощь и справка"},
+        ]
+        res = self.api_request("setMyCommands", {"commands": commands})
+        return bool(res)
+
 
 
 def format_tasks_view(user_id: int | str) -> tuple[str, dict]:
@@ -275,17 +304,40 @@ def format_reminder_menu(task_id: int, user_id: str | int) -> tuple[str, dict]:
 
 
 
+def get_base_webapp_url() -> str:
+    """Возвращает базовый URL Telegram WebApp (с автоопределением на Render/хостинге)."""
+    url = os.environ.get("WEBAPP_URL", "").strip()
+    if not url:
+        render_url = os.environ.get("RENDER_EXTERNAL_URL", "").strip()
+        if render_url:
+            url = f"{render_url.rstrip('/')}/webapp"
+        else:
+            url = "https://todo-student-i9xh.onrender.com/webapp"
+    
+    if url and not url.endswith("/webapp") and not url.endswith("/webapp/") and not url.endswith(".html") and not url.endswith("/app"):
+        url = url.rstrip("/") + "/webapp"
+
+    return url
+
+
+def get_user_webapp_url(user_id: int | str | None = None) -> str:
+    """Возвращает персональный URL WebApp с параметром user_id."""
+    base = get_base_webapp_url()
+    if not base:
+        return ""
+    if user_id:
+        sep = "&" if "?" in base else "?"
+        return f"{base}{sep}user_id={user_id}"
+    return base
+
+
 def get_main_reply_keyboard(user_id: int | str | None = None) -> dict:
     """Главная клавиатура внизу экрана."""
-    webapp_url = os.environ.get("WEBAPP_URL", "").strip()
+    target_url = get_user_webapp_url(user_id)
     keyboard = [
         [{"text": "📋 Список задач"}, {"text": "➕ Добавить задачу"}],
     ]
-    if webapp_url.startswith("https://"):
-        target_url = webapp_url
-        if user_id:
-            sep = "&" if "?" in webapp_url else "?"
-            target_url = f"{webapp_url}{sep}user_id={user_id}"
+    if target_url.startswith("https://") or target_url.startswith("http://"):
         keyboard.append([{"text": "🌐 Открыть веб-приложение", "web_app": {"url": target_url}}])
     keyboard.append([{"text": "ℹ️ Помощь"}])
 
@@ -305,6 +357,25 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
     # Индивидуальный идентификатор пользователя
     user_id = message.get("from", {}).get("id") or chat_id
     user_name = message.get("from", {}).get("first_name", "пользователь")
+    # 0. Обработка данных, переданных из WebApp (tg.sendData)
+    web_app_data = message.get("web_app_data")
+    if web_app_data:
+        data_text = web_app_data.get("data", "").strip()
+        try:
+            parsed = json.loads(data_text)
+            if isinstance(parsed, dict) and parsed.get("text"):
+                t = add_task(parsed["text"].strip(), user_id=user_id, reminder=parsed.get("reminder"))
+                bot.send_message(
+                    chat_id,
+                    f"✅ Задача из WebApp сохранена (<b>ID: #{t['id']}</b>):\n«{html.escape(t['text'])}»",
+                    reply_markup=get_main_reply_keyboard(user_id),
+                )
+                view_text, markup = format_tasks_view(user_id)
+                bot.send_message(chat_id, view_text, reply_markup=markup)
+                return
+        except Exception:
+            pass
+
     text = message.get("text", "").strip()
 
     if not text:
@@ -326,22 +397,109 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
     # Команда /start
     if text.startswith("/start"):
         pending_add.discard(user_id)
+        target_url = get_user_webapp_url(user_id)
+
+        # Автоматическая привязка кнопки меню чата для пользователя
+        if target_url.startswith("https://") or target_url.startswith("http://"):
+            try:
+                bot.set_chat_menu_button(chat_id=chat_id, webapp_url=target_url)
+            except Exception:
+                pass
+
         welcome = (
             f"👋 Привет, <b>{html.escape(user_name)}</b>!\n\n"
             "Я ваш <b>персональный бот-планировщик задач</b>.\n"
-            f"Ваш персональный ID: <code>{user_id}</code>.\n\n"
-            "🔒 <b>Все задачи хранятся индивидуально для вашего профиля и не видны другим пользователям бота.</b>\n\n"
+            f"Ваш ID: <code>{user_id}</code>.\n\n"
+            "🔒 <b>Все задачи хранятся индивидуально для вашего профиля и синхронизированы с WebApp.</b>\n\n"
             "📌 <b>Что я умею:</b>\n"
+            "• 🌐 <code>/app</code> — открыть веб-приложение (Telegram Mini App)\n"
             "• 📋 <code>/list</code> — показать ваш персональный список задач\n"
             "• ➕ <code>/add &lt;текст&gt;</code> — добавить задачу в ваш список\n"
+            "• ⏰ <code>/remind &lt;номер&gt; &lt;время&gt;</code> — настроить напоминание\n"
             "• ✅ <code>/done &lt;id&gt;</code> — отметить выполненной\n"
             "• 🗑️ <code>/delete &lt;id&gt;</code> — удалить задачу\n"
             "• ℹ️ <code>/help</code> — показать справку\n\n"
-            "<i>💡 Вы можете просто отправить любой текст в чат, и я добавлю его в ваш личный список!</i>"
+            "<i>💡 Нажмите кнопку «Задачи» слева от поля ввода или кнопку ниже для запуска Mini App!</i>"
         )
+        inline_kb = None
+        if target_url.startswith("https://") or target_url.startswith("http://"):
+            inline_kb = {
+                "inline_keyboard": [
+                    [{"text": "🚀 Открыть планировщик (Mini App)", "web_app": {"url": target_url}}]
+                ]
+            }
+
         bot.send_message(chat_id, welcome, reply_markup=get_main_reply_keyboard(user_id))
+        if inline_kb:
+            bot.send_message(chat_id, "📱 <b>Быстрый запуск Mini App:</b>", reply_markup=inline_kb)
         view_text, markup = format_tasks_view(user_id)
         bot.send_message(chat_id, view_text, reply_markup=markup)
+        return
+
+    # Команда /app, /webapp или нажатие кнопки веб-приложения
+    if text in ("/app", "/webapp", "🌐 Открыть веб-приложение") or text.startswith("/app"):
+        pending_add.discard(user_id)
+        target_url = get_user_webapp_url(user_id)
+        if target_url.startswith("https://") or target_url.startswith("http://"):
+            try:
+                bot.set_chat_menu_button(chat_id=chat_id, webapp_url=target_url)
+            except Exception:
+                pass
+            kb = {
+                "inline_keyboard": [
+                    [{"text": "🚀 Запустить планировщик (Mini App)", "web_app": {"url": target_url}}]
+                ]
+            }
+            bot.send_message(
+                chat_id,
+                f"🌐 <b>Telegram Mini App планировщика задач</b>\n\n"
+                f"👤 Профиль: <code>{user_id}</code>\n"
+                f"🔗 URL: <code>{target_url}</code>\n\n"
+                "Нажмите кнопку ниже или кнопку <b>«Задачи»</b> слева от строки ввода сообщения, чтобы открыть интерфейс:",
+                reply_markup=kb,
+            )
+        else:
+            bot.send_message(
+                chat_id,
+                "⚠️ Адрес веб-приложения пока не настроен на сервере.",
+                reply_markup=get_main_reply_keyboard(user_id),
+            )
+        return
+
+    # Команда /setwebapp <url> для изменения адреса на лету
+    if text.startswith("/setwebapp"):
+        parts = text.split(maxsplit=1)
+        if len(parts) < 2 or not parts[1].strip().startswith("http"):
+            curr_url = get_base_webapp_url()
+            bot.send_message(
+                chat_id,
+                f"ℹ️ Текущий URL WebApp: <code>{curr_url}</code>\n\n"
+                "Чтобы привязать новый адрес, отправьте команду:\n"
+                "<code>/setwebapp https://todo-student-i9xh.onrender.com/webapp</code>",
+            )
+            return
+
+        new_url = parts[1].strip()
+        os.environ["WEBAPP_URL"] = new_url
+        try:
+            bot.set_chat_menu_button(webapp_url=new_url)
+            bot.set_chat_menu_button(chat_id=chat_id, webapp_url=f"{new_url}?user_id={user_id}")
+        except Exception:
+            pass
+
+        target_url = get_user_webapp_url(user_id)
+        kb = {
+            "inline_keyboard": [
+                [{"text": "🚀 Проверить WebApp", "web_app": {"url": target_url}}]
+            ]
+        }
+        bot.send_message(
+            chat_id,
+            f"✅ <b>Новый URL WebApp успешно привязан!</b>\n\n"
+            f"🔗 <code>{new_url}</code>\n\n"
+            "Кнопка меню обновлена. Проверьте запуск по кнопке ниже:",
+            reply_markup=kb,
+        )
         return
 
     # Команда /help или кнопка "ℹ️ Помощь"
@@ -725,6 +883,22 @@ def run_bot() -> None:
     print(" ⏰ Служба напоминаний: АКТИВНА (проверка каждые 20 сек)")
     print(" Бот ожидает входящие сообщения. Для остановки нажмите Ctrl+C.")
     print("=" * 60 + "\n")
+
+    # Регистрация команд бота в меню Telegram
+    try:
+        bot.set_my_commands()
+        print(" 📋 Команды бота (/start, /app, /list, /add, /help) зарегистрированы в Telegram")
+    except Exception as e:
+        print(f" ⚠️ Не удалось зарегистрировать команды: {e}", file=sys.stderr)
+
+    # Привязка Telegram WebApp к кнопке меню чата (Menu Button)
+    base_app_url = get_base_webapp_url()
+    if base_app_url.startswith("https://") or base_app_url.startswith("http://"):
+        try:
+            bot.set_chat_menu_button(webapp_url=base_app_url)
+            print(f" 🌐 Telegram WebApp успешно привязан к кнопке меню чата: {base_app_url}")
+        except Exception as e:
+            print(f" ⚠️ Не удалось привязать кнопку меню WebApp: {e}", file=sys.stderr)
 
     # Запускаем фоновый планировщик напоминаний
     rem_thread = threading.Thread(target=reminder_worker, args=(bot,), daemon=True, name="ReminderWorker")
