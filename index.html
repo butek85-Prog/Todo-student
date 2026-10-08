@@ -1333,8 +1333,8 @@
         return clean;
       }
       let stored = localStorage.getItem("todo_user_id");
-      if (!stored || stored === "5265404800") {
-        stored = "web_" + Math.random().toString(36).substring(2, 9);
+      if (!stored || stored === "default" || stored === "null" || stored === "undefined") {
+        stored = "5265404800";
         localStorage.setItem("todo_user_id", stored);
       }
       return stored;
@@ -1446,8 +1446,8 @@
     async function fetchTasks() {
       if (state.isServerOnline) {
         try {
-          const url = `/api/tasks?user_id=${encodeURIComponent(state.userId)}`;
-          const res = await fetch(url);
+          const url = `/api/tasks?user_id=${encodeURIComponent(state.userId)}&_t=${Date.now()}`;
+          const res = await fetch(url, { cache: "no-store" });
           const data = await res.json();
           if (data.ok) {
             state.tasks = data.tasks;
@@ -2095,6 +2095,25 @@
       // 1. Проверяем сервер и загружаем задачи
       await checkServerStatus();
       await fetchTasks();
+
+      // Автоматическая фоновая синхронизация данных в реальном времени
+      setInterval(() => {
+        if (!document.hidden && state.isServerOnline) {
+          fetchTasks();
+        }
+      }, 3000);
+
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden && state.isServerOnline) {
+          fetchTasks();
+        }
+      });
+
+      window.addEventListener("focus", () => {
+        if (state.isServerOnline) {
+          fetchTasks();
+        }
+      });
 
       // 2. Инициализируем приветствие в чате
       sendBotMessageCommand("/start");

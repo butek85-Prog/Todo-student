@@ -8,12 +8,13 @@ const tg = window.Telegram?.WebApp;
 
 // Состояние приложения
 const state = {
-  userId: "local",
+  userId: "5265404800",
   userName: "Пользователь",
   tasks: [],
   currentTab: "all",
   searchQuery: "",
   isLoading: false,
+  lastTasksJson: "",
 };
 
 // DOM Элементы
@@ -78,6 +79,60 @@ function showToast(message) {
 }
 
 /**
+ * Извлекает объект пользователя Telegram из всех доступных источников WebApp SDK и URL
+ */
+function extractTelegramUser() {
+  const tg = window.Telegram?.WebApp;
+
+  // 1. Прямой объект в initDataUnsafe
+  if (tg?.initDataUnsafe?.user?.id) {
+    return tg.initDataUnsafe.user;
+  }
+
+  // 2. Строка запроса в tg.initData (в Telegram Web / Desktop)
+  if (tg?.initData) {
+    try {
+      const q = new URLSearchParams(tg.initData);
+      const userStr = q.get("user");
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        if (u && u.id) return u;
+      }
+    } catch (e) {
+      console.warn("Ошибка парсинга tg.initData:", e);
+    }
+  }
+
+  // 3. Хэш URL (#tgWebAppData=...)
+  if (window.location.hash) {
+    try {
+      const rawHash = window.location.hash.startsWith("#")
+        ? window.location.hash.substring(1)
+        : window.location.hash;
+      const hashParams = new URLSearchParams(rawHash);
+      const tgWebAppData = hashParams.get("tgWebAppData");
+      if (tgWebAppData) {
+        const innerParams = new URLSearchParams(tgWebAppData);
+        const userStr = innerParams.get("user");
+        if (userStr) {
+          const u = JSON.parse(userStr);
+          if (u && u.id) return u;
+        }
+      }
+      const directUser = hashParams.get("user");
+      if (directUser) {
+        const u = JSON.parse(directUser);
+        if (u && u.id) return u;
+      }
+    } catch (e) {
+      console.warn("Ошибка парсинга хэша Telegram:", e);
+    }
+  }
+
+  return null;
+}
+
+/**
  * Определение текущего пользователя из Telegram WebApp или URL/LocalStorage
  */
 function initUser() {
@@ -125,25 +180,28 @@ function initUser() {
     }
   }
 
-  // 1. Проверяем данные от Telegram WebApp
-  const tgUser = tg?.initDataUnsafe?.user;
+  // 1. Проверяем данные от Telegram WebApp (пользователь в Telegram)
+  const tgUser = extractTelegramUser();
   if (tgUser && tgUser.id) {
     state.userId = String(tgUser.id);
+    localStorage.setItem("todo_user_id", state.userId);
+    localStorage.setItem("todo_test_user_id", state.userId);
     const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ");
     state.userName = fullName || tgUser.username || `Пользователь #${tgUser.id}`;
     elements.userName.textContent = `Привет, ${tgUser.first_name || state.userName}!`;
-    elements.userSubtitle.textContent = `ID: ${state.userId} • Личный список`;
+    elements.userSubtitle.textContent = `ID: ${state.userId} • Синхронизировано с ботом`;
     if (tgUser.first_name) {
       elements.userAvatar.textContent = tgUser.first_name.charAt(0).toUpperCase();
     }
-    // Скрываем баннер браузера
+    // Скрываем баннер браузера при работе внутри Telegram
     elements.banner.classList.add("hidden");
     return;
   }
 
-  // 2. Если передан параметр user_id в URL (например, из ссылки бота)
+  // 2. Если передан параметр user_id в URL (например, из ссылки или инлайн-кнопки бота)
   if (paramUserId && paramUserId.trim()) {
     state.userId = paramUserId.trim();
+    localStorage.setItem("todo_user_id", state.userId);
     localStorage.setItem("todo_test_user_id", state.userId);
     elements.userName.textContent = `Мои задачи (${state.userId})`;
     elements.userSubtitle.textContent = "Личный список • Синхронизация активна";
@@ -156,16 +214,17 @@ function initUser() {
     return;
   }
 
-  // 3. Если открыто в обычном браузере (тестирование)
+  // 3. Если открыто в обычном браузере (тестирование / веб-режим)
   elements.banner.classList.remove("hidden");
 
-  let savedId = localStorage.getItem("todo_test_user_id");
-  if (!savedId || savedId === "5265404800") {
-    // Генерируем уникальный случайный ID для данного браузера/пользователя
-    savedId = "web_" + Math.random().toString(36).substring(2, 9);
-    localStorage.setItem("todo_test_user_id", savedId);
+  let savedId = localStorage.getItem("todo_user_id") || localStorage.getItem("todo_test_user_id");
+  if (!savedId || savedId === "default" || savedId === "null" || savedId === "undefined") {
+    // По умолчанию связываем с основным профилем Telegram (5265404800)
+    savedId = "5265404800";
   }
   state.userId = savedId;
+  localStorage.setItem("todo_user_id", state.userId);
+  localStorage.setItem("todo_test_user_id", state.userId);
 
   elements.bannerUserId.textContent = state.userId;
   elements.userName.textContent = `Мои задачи (${state.userId})`;
@@ -173,31 +232,48 @@ function initUser() {
 }
 
 /**
- * Загрузка списка задач с бэкенда
+ * Загрузка списка задач с бэкенда с предотвращением кэширования и проверкой изменений
  */
 async function fetchTasks(showSpinner = true) {
   if (showSpinner) {
     state.isLoading = true;
     elements.loadingIndicator.classList.remove("hidden");
     elements.emptyState.classList.add("hidden");
+    elements.refreshBtn.classList.add("rotating");
   }
 
-  elements.refreshBtn.classList.add("rotating");
-
   try {
-    const res = await fetch(`/api/tasks?user_id=${encodeURIComponent(state.userId)}`);
+    const timestamp = Date.now();
+    const res = await fetch(`/api/tasks?user_id=${encodeURIComponent(state.userId)}&_t=${timestamp}`, {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+      },
+    });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     const data = await res.json();
-    state.tasks = Array.isArray(data.tasks) ? data.tasks : [];
-    render();
+    const newTasks = Array.isArray(data.tasks) ? data.tasks : [];
+
+    const newTasksJson = JSON.stringify(newTasks);
+    // Обновляем DOM только если данные изменились либо запрошен принудительный спиннер
+    if (newTasksJson !== state.lastTasksJson || showSpinner) {
+      state.tasks = newTasks;
+      state.lastTasksJson = newTasksJson;
+      render();
+    }
   } catch (err) {
     console.error("Ошибка загрузки задач:", err);
-    showToast("⚠️ Ошибка синхронизации с сервером");
-    triggerHaptic("error");
+    if (showSpinner) {
+      showToast("⚠️ Ошибка синхронизации с сервером");
+      triggerHaptic("error");
+    }
   } finally {
-    state.isLoading = false;
-    elements.loadingIndicator.classList.add("hidden");
-    elements.refreshBtn.classList.remove("rotating");
+    if (showSpinner) {
+      state.isLoading = false;
+      elements.loadingIndicator.classList.add("hidden");
+      elements.refreshBtn.classList.remove("rotating");
+    }
   }
 }
 
@@ -245,6 +321,7 @@ async function handleAddTask(e) {
 
     if (data.ok && data.task) {
       state.tasks.push(data.task);
+      state.lastTasksJson = JSON.stringify(state.tasks);
       render();
       const remInfo = data.task.reminder ? " (с напоминанием ⏰)" : "";
       showToast(`✅ Задача добавлена!${remInfo}`);
@@ -287,11 +364,13 @@ async function handleToggleTask(taskId) {
     const data = await res.json();
     if (data.ok && data.task) {
       task.done = data.task.done;
+      state.lastTasksJson = JSON.stringify(state.tasks);
       render();
     }
   } catch (err) {
     console.error("Ошибка при переключении статуса:", err);
     task.done = previousState;
+    state.lastTasksJson = JSON.stringify(state.tasks);
     render();
     showToast("⚠️ Не удалось обновить статус");
     triggerHaptic("error");
@@ -313,6 +392,7 @@ async function handleDeleteTask(taskId, event) {
   setTimeout(async () => {
     const originalTasks = [...state.tasks];
     state.tasks = state.tasks.filter((t) => t.id !== taskId);
+    state.lastTasksJson = JSON.stringify(state.tasks);
     render();
 
     try {
@@ -331,6 +411,7 @@ async function handleDeleteTask(taskId, event) {
     } catch (err) {
       console.error("Ошибка при удалении задачи:", err);
       state.tasks = originalTasks;
+      state.lastTasksJson = JSON.stringify(state.tasks);
       render();
       showToast("❌ Не удалось удалить задачу");
       triggerHaptic("error");
@@ -359,6 +440,7 @@ async function handleClearCompleted() {
 
     if (!res.ok) throw new Error("Ошибка очистки");
     state.tasks = state.tasks.filter((t) => !t.done);
+    state.lastTasksJson = JSON.stringify(state.tasks);
     render();
     showToast(`🗑️ Очищено задач: ${completedCount}`);
     triggerHaptic("success");
@@ -425,6 +507,7 @@ async function handleSetReminder(taskId, currentReminder, event) {
       const idx = state.tasks.findIndex((t) => t.id === taskId);
       if (idx !== -1) {
         state.tasks[idx] = data.task;
+        state.lastTasksJson = JSON.stringify(state.tasks);
         render();
       }
       showToast(data.task.reminder ? `⏰ Напоминание установлено!` : "Напоминание выключено");
@@ -658,9 +741,11 @@ function setupEventListeners() {
     if (newId && newId.trim()) {
       const cleanId = newId.trim();
       state.userId = cleanId;
+      localStorage.setItem("todo_user_id", cleanId);
       localStorage.setItem("todo_test_user_id", cleanId);
       elements.bannerUserId.textContent = cleanId;
       elements.userName.textContent = `Мои задачи (${cleanId})`;
+      state.lastTasksJson = "";
       fetchTasks(true);
     }
   });
@@ -690,9 +775,40 @@ function setActiveTab(tab) {
   render();
 }
 
+/**
+ * Настройка автоматической синхронизации данных в реальном времени с ботом
+ */
+function setupAutoSync() {
+  // 1. Фоновый опрос каждые 3 секунды, когда страница активна
+  setInterval(() => {
+    if (!document.hidden && !state.isLoading) {
+      fetchTasks(false);
+    }
+  }, 3000);
+
+  // 2. Моментальное обновление при возвращении на экран / вкладку
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      fetchTasks(false);
+    }
+  });
+
+  window.addEventListener("focus", () => {
+    fetchTasks(false);
+  });
+
+  // 3. Обновление при событиях окна Telegram WebApp
+  if (tg && typeof tg.onEvent === "function") {
+    tg.onEvent("viewportChanged", () => {
+      fetchTasks(false);
+    });
+  }
+}
+
 // Запуск инициализации при загрузке страницы
 document.addEventListener("DOMContentLoaded", () => {
   initUser();
   setupEventListeners();
   fetchTasks(true);
+  setupAutoSync();
 });

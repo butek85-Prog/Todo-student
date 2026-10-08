@@ -17,7 +17,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import Body, FastAPI, HTTPException, Query, Request, status
+from fastapi import Body, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -73,13 +73,18 @@ app.add_middleware(
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
 def get_effective_user_id(user_id: Any = None) -> Optional[str]:
-    """Возвращает нормализованный user_id или None для локального/общего списка (tasks.json)."""
-    if user_id is None or not isinstance(user_id, (str, int)):
-        return None
-    s = str(user_id).strip()
-    if s.lower() in ("", "default", "null", "undefined", "none", "local"):
-        return None
-    return s
+    """Возвращает нормализованный user_id или DEFAULT_USER_ID или None для локального/общего списка (tasks.json)."""
+    if user_id is not None and isinstance(user_id, (str, int)):
+        s = str(user_id).strip()
+        if s and s.lower() not in ("default", "null", "undefined", "none", "local"):
+            return s
+
+    # Если явный user_id не передан, используем системный DEFAULT_USER_ID (привязка к боту)
+    default_env = os.environ.get("DEFAULT_USER_ID", "").strip()
+    if default_env and default_env.lower() not in ("default", "null", "undefined", "none", "local"):
+        return default_env
+
+    return None
 
 
 def get_all_users() -> list[dict[str, Any]]:
@@ -137,8 +142,12 @@ def api_users():
 
 
 @app.get("/api/tasks")
-def api_get_tasks(user_id: Optional[str] = Query(None)):
+def api_get_tasks(response: Response, user_id: Optional[str] = Query(None)):
     """Получение списка задач с фильтрацией по пользователю."""
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+
     eff_uid = get_effective_user_id(user_id)
     tasks = todo.load_tasks(eff_uid)
     total = len(tasks)
