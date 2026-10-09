@@ -208,8 +208,7 @@ function initUser() {
     if (tgUser.first_name) {
       elements.userAvatar.textContent = tgUser.first_name.charAt(0).toUpperCase();
     }
-    // Скрываем баннер браузера при работе внутри Telegram
-    elements.banner.classList.add("hidden");
+    if (elements.banner) elements.banner.classList.add("hidden");
     return;
   }
 
@@ -218,22 +217,14 @@ function initUser() {
     state.userId = paramUserId.trim();
     localStorage.setItem("todo_user_id", state.userId);
     localStorage.setItem("todo_test_user_id", state.userId);
-    elements.userName.textContent = `Мои задачи (${state.userId})`;
-    elements.userSubtitle.textContent = "Личный список • Синхронизация активна";
-    elements.bannerUserId.textContent = state.userId;
-    if (tg && (tg.platform === "web" || tg.platform === "weba" || tg.platform === "webk")) {
-      elements.banner.classList.add("hidden");
-    } else {
-      elements.banner.classList.remove("hidden");
-    }
+    elements.userName.textContent = "Мои задачи";
+    elements.userSubtitle.textContent = `ID: ${state.userId} • Синхронизировано с ботом`;
+    if (elements.banner) elements.banner.classList.add("hidden");
     return;
   }
 
-  // 3. Если открыто в обычном браузере (тестирование / веб-режим)
-  elements.banner.classList.remove("hidden");
-
+  // 3. Открыто напрямую (браузер / кнопка без параметров) - используем основной профиль бота
   let savedId = localStorage.getItem("todo_user_id") || localStorage.getItem("todo_test_user_id");
-  // Очищаем любые фиктивные/старые ID (web_xxx, default, local)
   if (!savedId || savedId === "default" || savedId === "null" || savedId === "undefined" || savedId === "local" || savedId.startsWith("web_")) {
     savedId = "5265404800";
   }
@@ -241,9 +232,9 @@ function initUser() {
   localStorage.setItem("todo_user_id", state.userId);
   localStorage.setItem("todo_test_user_id", state.userId);
 
-  elements.bannerUserId.textContent = state.userId;
-  elements.userName.textContent = `Мои задачи (${state.userId})`;
-  elements.userSubtitle.textContent = "Режим браузера • Личный список";
+  elements.userName.textContent = "Мои задачи";
+  elements.userSubtitle.textContent = `ID: ${state.userId} • Синхронизировано с ботом`;
+  if (elements.banner) elements.banner.classList.add("hidden");
 }
 
 /**

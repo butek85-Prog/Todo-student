@@ -54,25 +54,23 @@ def load_env_file() -> None:
 load_env_file()
 
 
-def get_default_user_id() -> str | None:
-    """Возвращает ID пользователя по умолчанию из окружения (например, из .env)."""
+def get_default_user_id() -> str:
+    """Возвращает ID пользователя по умолчанию из окружения (например, из .env) или основного пользователя бота."""
     uid = os.environ.get("DEFAULT_USER_ID")
     if uid and uid.strip() and uid.strip().lower() not in ("local", "default"):
         return uid.strip()
-    return None
+    return "5265404800"
 
 
 def get_tasks_file(user_id: str | int | None = None) -> Path:
-    """Возвращает путь к файлу задач: либо общий tasks.json, либо персональный user_tasks/{user_id}.json."""
-    if user_id is None:
+    """Возвращает путь к файлу задач: персональный user_tasks/{user_id}.json."""
+    if user_id is None or str(user_id).lower() in ("local", "default"):
         user_id = get_default_user_id()
 
-    if user_id is None or str(user_id).lower() in ("local", "default"):
-        return TASKS_FILE
     USER_TASKS_DIR.mkdir(parents=True, exist_ok=True)
     safe_id = "".join(c for c in str(user_id) if c.isalnum() or c in ("-", "_"))
     if not safe_id:
-        return TASKS_FILE
+        safe_id = get_default_user_id()
     return USER_TASKS_DIR / f"{safe_id}.json"
 
 

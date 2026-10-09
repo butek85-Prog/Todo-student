@@ -12,3 +12,5 @@ services:
         sync: false
       - key: WEBAPP_URL
         value: "https://todo-student-i9xh.onrender.com/webapp"
+      - key: DEFAULT_USER_ID
+        value: "5265404800"
