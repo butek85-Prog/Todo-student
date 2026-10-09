@@ -365,13 +365,17 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
             parsed = json.loads(data_text)
             if isinstance(parsed, dict) and parsed.get("text"):
                 t = add_task(parsed["text"].strip(), user_id=user_id, reminder=parsed.get("reminder"))
-                bot.send_message(
-                    chat_id,
-                    f"✅ Задача из WebApp сохранена (<b>ID: #{t['id']}</b>):\n«{html.escape(t['text'])}»",
-                    reply_markup=get_main_reply_keyboard(user_id),
-                )
                 view_text, markup = format_tasks_view(user_id)
-                bot.send_message(chat_id, view_text, reply_markup=markup)
+                rem_info = ""
+                if t.get("reminder"):
+                    disp = format_reminder_display(t.get("reminder"))
+                    rem_info = f"\n⏰ <i>Напоминание: {disp}</i>"
+                msg_text = (
+                    f"✅ Задача из WebApp сохранена (<b>ID: #{t['id']}</b>):\n"
+                    f"«{html.escape(t['text'])}»{rem_info}\n\n"
+                    f"{view_text}"
+                )
+                bot.send_message(chat_id, msg_text, reply_markup=markup)
                 return
         except Exception:
             pass
@@ -386,12 +390,12 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
         pending_add.discard(user_id)
         task = add_task(text, user_id=user_id)
         view_text, markup = format_tasks_view(user_id)
-        bot.send_message(
-            chat_id,
-            f"✅ Задача добавлена в ваш личный список (<b>ID: {task['id']}</b>):\n«{html.escape(task['text'])}»",
-            reply_markup=get_main_reply_keyboard(user_id),
+        msg_text = (
+            f"✅ Задача добавлена в ваш личный список (<b>ID: #{task['id']}</b>):\n"
+            f"«{html.escape(task['text'])}»\n\n"
+            f"{view_text}"
         )
-        bot.send_message(chat_id, view_text, reply_markup=markup)
+        bot.send_message(chat_id, msg_text, reply_markup=markup)
         return
 
     # Команда /start
@@ -568,12 +572,12 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
 
         if updated.get("reminder"):
             disp = format_reminder_display(updated.get("reminder"))
-            bot.send_message(chat_id, f"⏰ Напоминание для задачи #{task_id} установлено: <b>{disp}</b>")
+            status_text = f"⏰ Напоминание для задачи #{task_id} установлено: <b>{disp}</b>"
         else:
-            bot.send_message(chat_id, f"Напоминание для задачи #{task_id} отключено.")
+            status_text = f"Напоминание для задачи #{task_id} отключено."
 
         view_text, markup = format_tasks_view(user_id)
-        bot.send_message(chat_id, view_text, reply_markup=markup)
+        bot.send_message(chat_id, f"{status_text}\n\n{view_text}", reply_markup=markup)
         return
 
     # Команда /add <текст>
@@ -597,12 +601,12 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
         if task.get("reminder"):
             disp = format_reminder_display(task.get("reminder"))
             rem_info = f"\n⏰ <i>Напоминание: {disp}</i>"
-        bot.send_message(
-            chat_id,
-            f"✅ Задача добавлена в ваш список (<b>ID: {task['id']}</b>):\n«{html.escape(task['text'])}»{rem_info}",
-            reply_markup=get_main_reply_keyboard(user_id),
+        msg_text = (
+            f"✅ Задача добавлена в ваш список (<b>ID: #{task['id']}</b>):\n"
+            f"«{html.escape(task['text'])}»{rem_info}\n\n"
+            f"{view_text}"
         )
-        bot.send_message(chat_id, view_text, reply_markup=markup)
+        bot.send_message(chat_id, msg_text, reply_markup=markup)
         return
 
     # Команда /done <id>
@@ -620,9 +624,9 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
 
         task = set_task_done(task_id, True, user_id=user_id)
         if task:
-            bot.send_message(chat_id, f"✅ Задача #{task_id} выполнена:\n«{html.escape(task.get('text', ''))}»")
             view_text, markup = format_tasks_view(user_id)
-            bot.send_message(chat_id, view_text, reply_markup=markup)
+            msg_text = f"✅ Задача #{task_id} выполнена:\n«{html.escape(task.get('text', ''))}»\n\n{view_text}"
+            bot.send_message(chat_id, msg_text, reply_markup=markup)
         else:
             bot.send_message(chat_id, f"❌ Задача с ID #{task_id} не найдена в вашем списке.")
         return
@@ -641,9 +645,9 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
             return
 
         if delete_task(task_id, user_id=user_id):
-            bot.send_message(chat_id, f"🗑️ Задача #{task_id} удалена из вашего списка.")
             view_text, markup = format_tasks_view(user_id)
-            bot.send_message(chat_id, view_text, reply_markup=markup)
+            msg_text = f"🗑️ Задача #{task_id} удалена из вашего списка.\n\n{view_text}"
+            bot.send_message(chat_id, msg_text, reply_markup=markup)
         else:
             bot.send_message(chat_id, f"❌ Задача с ID #{task_id} не найдена в вашем списке.")
         return
@@ -652,12 +656,12 @@ def handle_message(bot: TelegramBot, message: dict, pending_add: set) -> None:
     if not text.startswith("/"):
         task = add_task(text, user_id=user_id)
         view_text, markup = format_tasks_view(user_id)
-        bot.send_message(
-            chat_id,
-            f"✅ Создана задача в вашем списке (<b>ID: {task['id']}</b>):\n«{html.escape(task['text'])}»",
-            reply_markup=get_main_reply_keyboard(user_id),
+        msg_text = (
+            f"✅ Создана задача в вашем списке (<b>ID: #{task['id']}</b>):\n"
+            f"«{html.escape(task['text'])}»\n\n"
+            f"{view_text}"
         )
-        bot.send_message(chat_id, view_text, reply_markup=markup)
+        bot.send_message(chat_id, msg_text, reply_markup=markup)
 
 
 def handle_callback_query(bot: TelegramBot, callback: dict) -> None:
