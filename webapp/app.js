@@ -6,6 +6,11 @@
 // Инициализация Telegram WebApp
 const tg = window.Telegram?.WebApp;
 
+if (tg) {
+  tg.ready();
+  tg.expand();
+}
+
 // Состояние приложения
 const state = {
   userId: "5265404800",
@@ -156,27 +161,7 @@ function initUser() {
 
   if (tg) {
     tg.ready();
-
-    const p = (tg.platform || "").toLowerCase();
-    const isDesktop = ["tdesktop", "macos", "web", "weba", "webk"].includes(p) || window.innerWidth >= 768;
-
-    if (!isDesktop) {
-      tg.expand();
-
-      // Запрос полноэкранного режима только для смартфонов (Bot API 8.0+)
-      if (typeof tg.requestFullscreen === "function") {
-        try {
-          tg.requestFullscreen();
-        } catch (e) {}
-      }
-
-      // Отключение вертикального смахивания (чтобы окно не сворачивалось при скролле)
-      if (typeof tg.disableVerticalSwipes === "function") {
-        try {
-          tg.disableVerticalSwipes();
-        } catch (e) {}
-      }
-    }
+    tg.expand();
 
     try {
       tg.enableClosingConfirmation();
