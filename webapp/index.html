@@ -29,6 +29,15 @@
   <link rel="stylesheet" href="style.css?v=2.2.0">
 </head>
 <body>
+  <!-- Панель для тестирования в обычном браузере (вне Telegram) -->
+  <div id="browser-banner" class="browser-banner hidden">
+    <div class="browser-banner-content">
+      <span class="browser-icon">🌐</span>
+      <span class="browser-text">Режим браузера. Текущий ID: <strong id="banner-user-id">local</strong></span>
+      <button id="switch-user-btn" class="banner-btn" title="Сменить ID">Сменить</button>
+    </div>
+  </div>
+
   <div class="app-container">
     <!-- Шапка приложения -->
     <header class="app-header">

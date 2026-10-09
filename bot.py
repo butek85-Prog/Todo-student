@@ -325,8 +325,6 @@ def get_user_webapp_url(user_id: int | str | None = None) -> str:
     base = get_base_webapp_url()
     if not base:
         return ""
-    if not user_id:
-        user_id = os.environ.get("DEFAULT_USER_ID", "5265404800")
     if user_id:
         sep = "&" if "?" in base else "?"
         return f"{base}{sep}user_id={user_id}"
@@ -898,7 +896,7 @@ def run_bot() -> None:
         print(f" ⚠️ Не удалось зарегистрировать команды: {e}", file=sys.stderr)
 
     # Привязка Telegram WebApp к кнопке меню чата (Menu Button)
-    base_app_url = get_user_webapp_url()
+    base_app_url = get_base_webapp_url()
     if base_app_url.startswith("https://") or base_app_url.startswith("http://"):
         try:
             bot.set_chat_menu_button(webapp_url=base_app_url)

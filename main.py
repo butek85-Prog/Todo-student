@@ -19,7 +19,7 @@ from typing import Any, Optional
 
 from fastapi import Body, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 # Загружаем окружение из .env
@@ -85,7 +85,7 @@ async def add_no_cache_headers(request: Request, call_next):
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
 def get_effective_user_id(user_id: Any = None) -> Optional[str]:
-    """Возвращает нормализованный user_id или DEFAULT_USER_ID основного пользователя бота."""
+    """Возвращает нормализованный user_id или DEFAULT_USER_ID или None для локального/общего списка (tasks.json)."""
     if user_id is not None and isinstance(user_id, (str, int)):
         s = str(user_id).strip()
         if s and s.lower() not in ("default", "null", "undefined", "none", "local") and not s.lower().startswith("web_"):
@@ -96,7 +96,7 @@ def get_effective_user_id(user_id: Any = None) -> Optional[str]:
     if default_env and default_env.lower() not in ("default", "null", "undefined", "none", "local") and not default_env.lower().startswith("web_"):
         return default_env
 
-    return "5265404800"
+    return None
 
 
 def get_all_users() -> list[dict[str, Any]]:
@@ -438,14 +438,23 @@ if WEBAPP_DIR.exists() and WEBAPP_DIR.is_dir():
     app.mount("/webapp", StaticFiles(directory=str(WEBAPP_DIR), html=True), name="webapp")
 
 
-@app.get("/")
-@app.get("/app")
-@app.get("/mini-app")
-def redirect_to_webapp(request: Request):
-    """Единая точка входа: всегда открывает Telegram Mini App."""
-    query = request.url.query
-    dest = f"/webapp?{query}" if query else "/webapp"
-    return RedirectResponse(url=dest, status_code=302)
+@app.get("/app", response_class=HTMLResponse)
+@app.get("/mini-app", response_class=HTMLResponse)
+def get_mini_app():
+    """Быстрый доступ к Telegram Mini App."""
+    mini_app_file = WEBAPP_DIR / "index.html"
+    if mini_app_file.exists():
+        return FileResponse(mini_app_file)
+    return HTMLResponse("<h3>Mini App не найден</h3>", status_code=404)
+
+
+# 2. Главная страница (Веб-интерфейс + эмулятор)
+@app.get("/", response_class=HTMLResponse)
+def get_index():
+    """Главная страница веб-планировщика."""
+    if INDEX_HTML.exists():
+        return FileResponse(INDEX_HTML)
+    return HTMLResponse("<h3>index.html не найден</h3>", status_code=404)
 
 
 # ===================== ПРЯМОЙ ЗАПУСК ЧЕРЕЗ PYTHON =====================
